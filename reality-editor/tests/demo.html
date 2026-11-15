@@ -1,0 +1,168 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>demo</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #game { width: 100vw; height: 100vh; display: block; }
+</style>
+<canvas id="game"></canvas>
+<script type="module">
+// A state-driven bot that plays the whole game on the real loop, used to record
+// gameplay. It reacts to game state rather than to frame counts, so it works at
+// any frame rate.
+await import('../src/main.js');
+
+const R = window.__reality;
+const canvas = document.getElementById('game');
+const key = (type, code) => dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
+const pointer = (type, x, y) => canvas.dispatchEvent(new PointerEvent(type, {
+  clientX: x, clientY: y, button: 0, buttons: 1, bubbles: true, pointerId: 1, pointerType: 'mouse'
+}));
+
+const toClient = (wx, wy) => ({
+  x: ((wx - R.cam.x - 960) * R.cam.zoom + 960) * R.view.scale + R.view.ox,
+  y: ((wy - 540) * R.cam.zoom + 540) * R.view.scale + R.view.oy
+});
+
+const held = new Set();
+function hold(code, on) {
+  if (on && !held.has(code)) { held.add(code); key('keydown', code); }
+  if (!on && held.has(code)) { held.delete(code); key('keyup', code); }
+}
+function tap(code) { key('keydown', code); key('keyup', code); }
+
+const dolly = R.world.byId('dolly');
+const dollyX = () => R.world.stateAt(dolly, R.world.time).x;
+
+const wallStart = { x: 840, y: 395 };
+const wallEnd = { x: 1185, y: 840 };
+
+// record the canvas at 30fps so the clip plays back at real speed
+const chunks = [];
+let rec = null;
+try {
+  const stream = canvas.captureStream(30);
+  rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  rec.start(200);
+} catch (err) {
+  rec = null;
+}
+
+window.__videoPromise = rec
+  ? new Promise((resolve) => {
+      rec.onstop = () => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result);
+        fr.readAsDataURL(new Blob(chunks, { type: 'video/webm' }));
+      };
+      setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 60000);
+    })
+  : Promise.resolve('no-recorder');
+
+window.__bot = () => ({ phase, t, state: R.state, x: Math.round(R.player.x), footage: +R.world.time.toFixed(1) });
+
+let phase = 'title';
+let t = 0;
+let frames = 0;
+let settle = 0;
+window.__log = [];
+
+function dragTo(u) {
+  const a = toClient(wallStart.x + (wallEnd.x - wallStart.x) * u,
+                     wallStart.y + (wallEnd.y - wallStart.y) * u);
+  pointer('pointermove', a.x, a.y);
+}
+
+function step() {
+  try { tick(); } catch (err) { phase = `error: ${err.message}`; }
+  if (phase !== 'done') requestAnimationFrame(step);
+  else document.title = 'demo done';
+}
+
+function tick() {
+  const w = R.world;
+  const p = R.player;
+  t++;
+  frames++;
+  if (frames % 20 === 0) {
+    window.__log.push([+(performance.now() / 1000).toFixed(1), phase, t,
+      +w.time.toFixed(2), +w.tape.toFixed(1), w.rewinding ? 1 : 0, Math.round(p.x)]);
+  }
+
+  switch (phase) {
+    case 'title':
+      if (R.state === 'playing') { hold('Space', false); phase = 'walk-wall'; t = 0; }
+      else hold('Space', t >= 40 && t <= 46);
+      break;
+
+    case 'walk-wall':
+      hold('KeyD', p.x < 790);
+      if (p.x > 780 || t > 400) { hold('KeyD', false); phase = 'drag'; t = 0; }
+      break;
+
+    case 'drag': {
+      if (t === 1) { const a = toClient(wallStart.x, wallStart.y); pointer('pointerdown', a.x, a.y); }
+      if (t > 1 && t < 44) dragTo((t - 1) / 42);
+      if (t === 44) { const b = toClient(wallEnd.x, wallEnd.y); pointer('pointerup', b.x, b.y); }
+      if (t > 70) { phase = 'walk-gap'; t = 0; }
+      break;
+    }
+
+    case 'walk-gap':
+      hold('KeyD', p.x < 1590);
+      if (p.x >= 1585 || t > 500) { hold('KeyD', false); phase = 'rewind-dolly'; t = 0; }
+      break;
+
+    case 'rewind-dolly':
+      hold('KeyR', dollyX() > 1638);
+      if (dollyX() <= 1638 || t > 900) { hold('KeyR', false); phase = 'board'; t = 0; }
+      break;
+
+    case 'board':
+      hold('KeyD', p.x < 1690);
+      if (p.x >= 1680 || t > 200) { hold('KeyD', false); phase = 'ride'; t = 0; }
+      break;
+
+    case 'ride':
+      hold('KeyD', false);
+      if (dollyX() >= 1916 || t > 900) { phase = 'walk-final'; t = 0; }
+      break;
+
+    case 'walk-final':
+      hold('KeyD', p.x < 2900);
+      if (p.x >= 2890 || t > 700) { hold('KeyD', false); phase = 'rewind-load'; t = 0; settle = 0; }
+      break;
+
+    case 'rewind-load':
+      hold('KeyR', !w.sensorLoaded());
+      if (w.sensorLoaded()) {
+        settle++;
+        // let the rewind flag clear before cutting, or the edit is rejected
+        if (settle >= 3) {
+          const d = R.world.byId('wheel');
+          w.commitCut({ x: d.x - 10, y: d.y - 10, w: d.w + 20, h: d.h + 20 });
+          phase = 'to-exit';
+          t = 0;
+        }
+      } else {
+        settle = 0;
+      }
+      break;
+
+    case 'to-exit':
+      hold('KeyD', R.state !== 'won');
+      if (R.state === 'won' || t > 700) { hold('KeyD', false); phase = 'credits'; t = 0; }
+      break;
+
+    case 'credits':
+      if (t > 110) { if (rec) rec.stop(); phase = 'done'; }
+      break;
+
+    default:
+      break;
+  }
+}
+
+requestAnimationFrame(step);
+</script>

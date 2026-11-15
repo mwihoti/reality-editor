@@ -1,0 +1,312 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>booting</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #game { width: 1920px; height: 1080px; display: block; }
+  #out { position: fixed; left: 0; top: 0; color: #fff; font: 12px monospace; white-space: pre; }
+</style>
+<canvas id="game"></canvas>
+<pre id="out"></pre>
+<script type="module">
+import { LEVEL } from '../src/level.js';
+import { CONFIG } from '../src/config.js';
+import { createGame } from '../src/game.js';
+import { World } from '../src/world.js';
+
+const out = [];
+let pass = 0, fail = 0;
+const ok = (name, cond, extra = '') => {
+  if (cond) pass++; else fail++;
+  out.push(`${cond ? 'PASS' : 'FAIL'}  ${name}${extra ? '   [' + extra + ']' : ''}`);
+};
+
+const canvas = document.getElementById('game');
+const g = createGame(canvas, LEVEL);
+g.resize();
+const STEP = CONFIG.step;
+
+const press = (code) => dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+const release = (code) => dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+const steps = (n) => { for (let i = 0; i < n; i++) g.step(STEP); };
+const toScreen = (wx, wy) => ({
+  x: (wx - g.cam.x - 960) * g.cam.zoom + 960,
+  y: (wy - 540) * g.cam.zoom + 540
+});
+const client = (x, y) => ({
+  x: x * g.view.scale + g.view.ox,
+  y: y * g.view.scale + g.view.oy
+});
+const pointer = (type, x, y) => {
+  const c = client(x, y);
+  canvas.dispatchEvent(new PointerEvent(type, {
+    clientX: c.x, clientY: c.y, button: 0, buttons: 1, bubbles: true, pointerId: 1, pointerType: 'mouse'
+  }));
+};
+const drag = (x0, y0, x1, y1) => {
+  pointer('pointerdown', x0, y0);
+  pointer('pointermove', x1, y1);
+  pointer('pointerup', x1, y1);
+  steps(2);
+};
+const dollyX = () => g.world.stateAt(g.world.byId('dolly'), g.world.time).x;
+
+// ---- A. boot, movement, jump ---------------------------------------------
+ok('boots on the title screen', g.state === 'title');
+press('Space'); steps(3); release('Space'); steps(2);
+ok('space starts the run', g.state === 'playing', g.state);
+ok('starts with four blades', g.world.cutsLeft() === 4);
+ok('starts with full tape', Math.abs(g.world.tape - CONFIG.rules.maxTape) < 1e-9);
+ok('clock starts at the head of the scene', g.world.time >= CONFIG.rules.startTime);
+
+steps(6);
+const x0 = g.player.x;
+press('KeyD'); steps(90); release('KeyD'); steps(10);
+ok('walks right', g.player.x > x0 + 120, `dx=${(g.player.x - x0).toFixed(0)}`);
+ok('rests on the stage floor', Math.abs(g.player.y - 726) < 2, `y=${g.player.y.toFixed(0)}`);
+
+const yBefore = g.player.y;
+press('Space'); steps(12);
+const yRise = g.player.y;
+release('Space'); steps(90);
+ok('jumps', yRise < yBefore - 60, `rise=${(yBefore - yRise).toFixed(0)}`);
+ok('lands again', Math.abs(g.player.y - yBefore) < 3, `y=${g.player.y.toFixed(0)}`);
+
+// ---- B. cutting -----------------------------------------------------------
+g.startRun();
+g.player.place(700, 726);
+g.cam.x = 0;
+steps(4);
+
+const beforeBlades = g.world.cutsLeft();
+const p1 = toScreen(870, 700), p2 = toScreen(950, 800);   // one crate of the wall
+drag(p1.x, p1.y, p2.x, p2.y);
+const firstCut = g.world.cuts[0];
+ok('drag-cut removes exactly the boxed crate',
+  g.world.cuts.length === 1 && firstCut.ids.length === 1 && firstCut.ids[0] === 'wall-r0c0',
+  JSON.stringify(firstCut && firstCut.ids));
+ok('a blade is spent per cut', g.world.cutsLeft() === beforeBlades - 1);
+ok('non-cuttable props are never cut', g.world.cuttableProps().every(p => p.cuttable === true));
+
+const floorProbe = g.world.commitCut({ x: 0, y: 830, w: 400, h: 40 });
+ok('a rectangle over the stage floor cuts nothing', floorProbe.ok === false && floorProbe.reason === 'nothing');
+const edgeProbe = g.world.commitCut({ x: 860, y: 400, w: 40, h: 40 });   // crate centre is outside
+ok('anchor must be inside the rectangle', edgeProbe.ok === false);
+
+// full wall cut through the real pointer path
+g.startRun();
+g.player.place(700, 726);
+g.cam.x = 0;
+steps(4);
+const q1 = toScreen(840, 400), q2 = toScreen(1180, 840);
+drag(q1.x, q1.y, q2.x, q2.y);
+ok('one drag clears the whole wall', g.world.cuts[0] && g.world.cuts[0].ids.length === 12,
+  String(g.world.cuts[0] && g.world.cuts[0].ids.length));
+ok('four blades minus one', g.world.cutsLeft() === 3);
+
+// blade exhaustion on a synthetic level
+const fakeLevel = {
+  props: Array.from({ length: 6 }, (_, i) => ({
+    id: 'c' + i, kind: 'crate', x: i * 100, y: 0, w: 80, h: 80, solid: true, cuttable: true
+  })),
+  drive: { id: 'none' }, load: { anchorCX: 0, minCX: 0, speed: 0 }, sensorCX: 0
+};
+const w2 = new World(fakeLevel);
+for (let i = 0; i < CONFIG.rules.maxCuts; i++) w2.commitCut({ x: i * 100 - 5, y: -5, w: 90, h: 90 });
+ok('blades run out at the cap', w2.cutsLeft() === 0);
+const blocked = w2.commitCut({ x: 400, y: -5, w: 90, h: 90 });
+ok('cutting with no blades is refused', blocked.ok === false && blocked.reason === 'no-blades');
+
+// ---- C. time travel -------------------------------------------------------
+g.startRun();
+g.player.place(700, 726);
+g.cam.x = 0;
+steps(4);
+g.world.commitCut({ x: 850, y: 400, w: 380, h: 460 });
+const cutTime = g.world.time;
+ok('wall crates are gone after the cut', !g.world.alive(g.world.byId('wall-r0c0')));
+
+g.player.place(1200, 726);            // stand clear of the re-materialising wall
+const tapeBefore = g.world.tape;
+const clockBefore = g.world.time;
+press('KeyR');
+steps(120);
+release('KeyR');
+steps(2);
+ok('one second of tape rewinds 1.6s of footage',
+  Math.abs((clockBefore - g.world.time) - 1.6) < 0.06, `${(clockBefore - g.world.time).toFixed(2)}`);
+ok('tape is spent at 1x', Math.abs((tapeBefore - g.world.tape) - 1) < 0.03);
+ok('rewinding past a cut restores the prop', g.world.alive(g.world.byId('wall-r0c0')));
+ok('the blade comes back with it', g.world.cutsLeft() === 4);
+
+let guard = 0;
+while (g.world.time < cutTime + 0.3 && guard++ < 4000) g.step(STEP);
+ok('playing past the edit re-applies it', !g.world.alive(g.world.byId('wall-r0c0')));
+
+const d = g.world.byId('dolly');
+ok('prop motion is a pure function of the clock',
+  g.world.stateAt(d, 3.25).x === g.world.stateAt(d, 3.25).x);
+ok('the dolly actually moves',
+  Math.abs(g.world.stateAt(d, CONFIG.rules.startTime).x - g.world.stateAt(d, CONFIG.rules.startTime + 4).x) > 100);
+
+g.startRun();
+g.player.place(1500, 726);
+steps(2);
+const solidsPlaying = g.world.solids().length;
+press('KeyR'); steps(3);
+const solidsRewinding = g.world.solids().length;
+release('KeyR'); steps(2);
+ok('moving props stop colliding during rewind', solidsRewinding === solidsPlaying - 1,
+  `${solidsPlaying} -> ${solidsRewinding}`);
+ok('the player does not move with the tape', Math.abs(g.player.x - 1500) < 2);
+
+// tape floor
+g.startRun();
+g.world.tape = 0.05;
+press('KeyR'); steps(60); release('KeyR');
+ok('tape never goes negative', g.world.tape >= 0);
+ok('rewind stops when the tape is spent', !g.world.rewinding || g.world.tape === 0);
+
+// ---- D. puzzle 1: the impossible wall ------------------------------------
+g.startRun();
+g.player.place(700, 726);
+g.cam.x = 0;
+steps(4);
+press('KeyD'); steps(200); release('KeyD'); steps(4);
+ok('the wall blocks the corridor', g.player.x < 860, `x=${g.player.x.toFixed(0)}`);
+ok('the wall cannot be jumped', g.player.y >= 726);
+
+g.cam.x = 0;
+const c1 = toScreen(840, 400), c2 = toScreen(1180, 840);
+drag(c1.x, c1.y, c2.x, c2.y);
+press('KeyD'); steps(240); release('KeyD'); steps(4);
+ok('cutting the wall opens the corridor', g.player.x > 1200, `x=${g.player.x.toFixed(0)}`);
+ok('scene one is marked cleared', g.world.progress.scene1 === true);
+
+// ---- E. puzzle 2: the moving dolly ---------------------------------------
+g.startRun();
+g.player.place(1560, 726);
+g.cam.x = 700;
+steps(600);                                   // 5s: dolly runs to the far end
+ok('the dolly ends up at the far side', dollyX() > 1900, `x=${dollyX().toFixed(0)}`);
+
+press('KeyD'); steps(200); release('KeyD'); steps(200);
+ok('the gap is not crossable without the dolly', g.player.x < 2120, `x=${g.player.x.toFixed(0)}`);
+
+g.player.place(1560, 726);
+steps(2);
+press('KeyR');
+guard = 0;
+while (dollyX() > 1700 && guard++ < 2000) g.step(STEP);
+release('KeyR');
+steps(2);
+ok('rewinding walks the dolly back to the ledge', dollyX() <= 1702, `x=${dollyX().toFixed(0)}`);
+
+const boardX = dollyX() + 70;
+g.player.place(boardX, 726);
+steps(6);
+ok('the player can stand on the dolly', Math.abs(g.player.y - 726) < 3, `y=${g.player.y.toFixed(0)}`);
+const rideStart = g.player.x;
+steps(420);                                    // stand still and ride
+ok('the dolly carries the player across', g.player.x > rideStart + 150,
+  `dx=${(g.player.x - rideStart).toFixed(0)}`);
+press('KeyD'); steps(150); release('KeyD'); steps(2);
+ok('the player reaches the far stage', g.player.x > 2120, `x=${g.player.x.toFixed(0)}`);
+ok('scene two is marked cleared', g.world.progress.scene2 === true);
+
+// ---- F. puzzle 3: the final edit -----------------------------------------
+g.startRun();
+g.player.place(2900, 726);
+g.cam.x = 1962;
+steps(4);
+const w = g.world;
+const wheelRect = { x: 2680, y: 520, w: 170, h: 170 };
+
+ok('the load starts parked at the end stop', Math.abs(w.loadCX() - 3310) < 1, `x=${w.loadCX().toFixed(0)}`);
+ok('the sensor starts unloaded', !w.sensorLoaded());
+ok('the exit starts closed', !w.exitOpen());
+ok('the shutter blocks the exit', w.solids().some(s => s.id === 'shutter'));
+
+w.commitCut(wheelRect);
+ok('cutting the wheel stops the load line', !w.driveRunning());
+ok('cutting the wheel alone does not load the sensor', !w.sensorLoaded());
+ok('the exit is still shut after a premature cut', !w.exitOpen());
+
+press('KeyR'); steps(90); release('KeyR'); steps(2);
+ok('rewinding past the cut restores the drive wheel', w.driveRunning());
+ok('the blade is refunded with it', w.cutsLeft() === 4);
+
+press('KeyR');
+guard = 0;
+while (Math.abs(w.loadCX() - LEVEL.sensorCX) > 15 && guard++ < 4000) g.step(STEP);
+release('KeyR'); steps(2);
+ok('rewinding walks the load onto the sensor', w.sensorLoaded(), `load=${w.loadCX().toFixed(0)}`);
+ok('the sensor opens the exit', w.exitOpen());
+ok('the open shutter stops blocking', !w.solids().some(s => s.id === 'shutter'));
+
+steps(360);   // let time run forward
+ok('the load drifts off the sensor again', !w.sensorLoaded());
+ok('the exit shuts again', !w.exitOpen());
+
+press('KeyR');
+guard = 0;
+while (Math.abs(w.loadCX() - LEVEL.sensorCX) > 15 && guard++ < 4000) g.step(STEP);
+release('KeyR'); steps(2);
+ok('the load is on the sensor a second time', w.sensorLoaded(), `load=${w.loadCX().toFixed(0)}`);
+w.commitCut(wheelRect);
+ok('cutting the wheel on the sensor freezes the line', !w.driveRunning());
+steps(600);
+ok('the frozen load holds the sensor', w.sensorLoaded());
+ok('the exit stays open', w.exitOpen());
+
+g.player.place(3400, 726);
+press('KeyD'); steps(300); release('KeyD'); steps(4);
+ok('the player reaches the exit', g.state === 'won', g.state);
+ok('the win screen has stats', !!g.game.stats && typeof g.game.stats.time === 'number');
+
+// ---- G. pause, restart, screens -----------------------------------------
+g.startRun();
+ok('restart returns to play', g.state === 'playing');
+ok('restart clears the cut log', g.world.cuts.length === 0);
+ok('restart refills the tape', Math.abs(g.world.tape - CONFIG.rules.maxTape) < 1e-9);
+ok('restart clears progress', g.world.progress.scene1 === false && g.world.progress.won === false);
+
+press('Escape'); steps(3);
+ok('escape pauses', g.state === 'paused', g.state);
+const pausedTime = g.world.time;
+const pausedX = g.player.x;
+steps(120);
+ok('a paused world does not advance', g.world.time === pausedTime);
+ok('a paused player does not move', g.player.x === pausedX);
+press('Escape'); steps(3);
+ok('escape resumes', g.state === 'playing');
+
+press('Backspace'); steps(3); release('Backspace');
+ok('backspace restarts the room', g.world.cuts.length === 0 && g.state === 'playing');
+
+// title button click
+g.startRun();
+g.game.state = 'title';
+const startBtn = CONFIG.ui.title[0];
+pointer('pointerdown', startBtn.x + 10, startBtn.y + 10);
+pointer('pointerup', startBtn.x + 10, startBtn.y + 10);
+const clickDbg = {
+  clicked: g.input.clicked, drag: g.input.dragging, touch: g.input.touchMode,
+  win: `${window.innerWidth}x${window.innerHeight}`, scale: g.view.scale, ox: g.view.ox, oy: g.view.oy
+};
+steps(3);
+ok('the start button launches the run', g.state === 'playing', `${g.state} ${JSON.stringify(clickDbg)}`);
+
+// fall respawn: drop the player into the gap, below the stage
+const dolly = g.world.byId('dolly');
+g.startRun();
+const gapX = g.world.stateAt(dolly, g.world.time).x + 100;
+g.player.place(gapX, 1300);
+steps(60);
+ok('falling respawns at the last ledge',
+  Math.abs(g.player.x - 1300) < 4 && Math.abs(g.player.y - 726) < 3,
+  `x=${g.player.x.toFixed(0)} y=${g.player.y.toFixed(0)}`);
+
+document.getElementById('out').textContent = out.join('\n');
+document.title = fail === 0 ? `TESTS PASS ${pass}/${pass}` : `TESTS FAIL ${fail}`;
+</script>

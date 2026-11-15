@@ -1,0 +1,65 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>booting</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #game { width: 1920px; height: 1080px; display: block; }
+</style>
+<canvas id="game"></canvas>
+<script type="module">
+// Boots the real game loop (main.js drives requestAnimationFrame) and plays
+// through actual animation frames — no manual stepping anywhere.
+// Headless Chromium only renders a handful of frames per load, so the script
+// is deliberately short: start, walk, cut, rewind.
+
+await import('../src/main.js');
+
+const R = window.__reality;
+const key = (type, code) => dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
+
+let frames = 0;
+let startedX = null;
+let moved = false;
+let cut = false;
+let rewinding = false;
+
+function tick() {
+  frames++;
+
+  if (frames <= 3) key('keydown', 'Space');
+
+  if (R.state === 'playing') {
+    key('keyup', 'Space');
+    if (startedX === null) {
+      startedX = R.player.x;
+      key('keydown', 'KeyD');
+    }
+  }
+
+  if (startedX !== null && !moved && R.player.x > startedX + 8) {
+    moved = true;
+    key('keyup', 'KeyD');
+    R.world.commitCut({ x: 850, y: 400, w: 380, h: 460 });
+    cut = R.world.cutsLeft() === 3;
+    key('keydown', 'KeyR');
+  }
+
+  if (cut && R.world.rewinding) rewinding = true;
+
+  document.title = [
+    `frames=${frames}`,
+    `state=${R.state}`,
+    `moved=${moved}`,
+    `cut=${cut}`,
+    `rewinding=${rewinding}`,
+    `x=${R.player.x.toFixed(1)}`,
+    `time=${R.world.time.toFixed(2)}`,
+    `tape=${R.world.tape.toFixed(2)}`,
+    `blades=${R.world.cutsLeft()}`
+  ].join(' ');
+
+  if (frames < 300) requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+</script>

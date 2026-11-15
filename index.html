@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Squat loop — code-drawn cartoon character</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: grid;
+    place-items: center;
+    background: radial-gradient(120% 90% at 50% 0%, #33304c 0%, #1b1930 55%, #0f0e1b 100%);
+    font: 600 11px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #a9a5c8;
+  }
+  .poster {
+    width: min(94vw, 760px);
+    border-radius: 26px;
+    overflow: hidden;
+    box-shadow: 0 26px 70px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+  }
+  canvas { width: 100%; aspect-ratio: 900 / 760; display: block; }
+</style>
+</head>
+<body>
+  <div class="poster"><canvas id="stage" aria-label="Animated cartoon woman doing squats"></canvas></div>
+
+<script>
+(() => {
+  const cv = document.getElementById('stage');
+  const ctx = cv.getContext('2d');
+
+  // ---- artwork space --------------------------------------------------------
+  const W = 900, H = 760, GROUND = 626, PERIOD = 2.9;
+
+  const C = {
+    ink:   '#2c2334',
+    skin:  '#f8c8a4',
+    skinS: '#e2ab83',
+    hair:  '#5d2c45',
+    hairL: '#7b3d5c',
+    top:   '#ff6f7d',
+    legs:  '#314b7d',
+    legsS: '#243964',
+    shoe:  '#ffd166',
+    shoeS: '#cf9733',
+    sole:  '#f7f2e8',
+    soleS: '#ded4c2'
+  };
+
+  // freeze a pose for inspection: index.html?t=1.45
+  const frozen = new URLSearchParams(location.search).get('t');
+
+  // ---- math -----------------------------------------------------------------
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = (p, a, b) => { const u = clamp((p - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
+  const on = (origin, dir, dist) => ({ x: origin.x + dir.x * dist, y: origin.y + dir.y * dist });
+
+  const THIGH = 138, SHIN = 132, HEAD_R = 56;
+  const ANKLE = { x: 510, y: GROUND - 52 };
+
+  // two-bone IK: place the knee, always bending forward
+  function solveKnee(hip, ankle, l1, l2) {
+    const dx = ankle.x - hip.x, dy = ankle.y - hip.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const d = clamp(len, Math.abs(l1 - l2) + 2, l1 + l2 - 2);
+    const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+    const mx = hip.x + ux * a, my = hip.y + uy * a;
+    const k1 = { x: mx - uy * h, y: my + ux * h };
+    const k2 = { x: mx + uy * h, y: my - ux * h };
+    return k1.x >= k2.x ? k1 : k2;
+  }
+
+  // ---- pose -----------------------------------------------------------------
+  function poseAt(time) {
+    const p = ((time % PERIOD) + PERIOD) % PERIOD / PERIOD;
+    const q = clamp(smooth(p, 0.04, 0.40) - smooth(p, 0.50, 0.90), 0, 1); // 0 up, 1 bottom
+
+    const hip = { x: lerp(472, 426, q), y: lerp(318, 430, q) };
+    const lean = lerp(0.15, 0.46, q);
+    const u = { x: Math.sin(lean), y: -Math.cos(lean) };      // up the spine
+    const pv = { x: Math.cos(lean), y: Math.sin(lean) };      // body front
+
+    const sh = on(hip, u, 134);
+    const headC = on(sh, u, 24 + HEAD_R);
+
+    const ankleN = { x: ANKLE.x, y: ANKLE.y };
+    const ankleF = { x: ANKLE.x - 96, y: ANKLE.y + 2 };
+    const kneeN = solveKnee(hip, ankleN, THIGH, SHIN);
+    const kneeF = solveKnee(hip, ankleF, THIGH, SHIN);
+
+    const arm = (bias) => {
+      const a1 = lerp(0.18, 1.22, q) + bias;
+      const a2 = a1 + lerp(0.18, 0.42, q);
+      const elbow = { x: sh.x + Math.sin(a1) * 78, y: sh.y + Math.cos(a1) * 78 };
+      const wrist = { x: elbow.x + Math.sin(a2) * 68, y: elbow.y + Math.cos(a2) * 68 };
+      return { elbow, wrist };
+    };
+
+    return { q, hip, sh, headC, u, pv, kneeN, kneeF, ankleN, ankleF,
+             near: arm(0), far: arm(-0.16) };
+  }
+
+  // ---- painters -------------------------------------------------------------
+  function limb(pts, widths, color) {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = Math.max(...widths) + 13;
+    ctx.stroke();
+    ctx.strokeStyle = color;
+    for (let i = 1; i < pts.length; i++) {
+      ctx.beginPath();
+      ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+      ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.lineWidth = widths[i - 1];
+      ctx.stroke();
+    }
+  }
+
+  function drawTorso(pose) {
+    const { hip, sh, u, pv } = pose;
+    const hipF = on(hip, pv, 34), hipB = on(hip, pv, -35);
+    const shF = on(sh, pv, 42), shB = on(sh, pv, -44);
+    const waist = on(hip, u, 62);
+    const midF = on(waist, pv, 50), midB = on(waist, pv, -40);
+    const crown = on(sh, u, 26);
+    const seat = on(hip, u, -18);
+
+    ctx.beginPath();
+    ctx.moveTo(hipF.x, hipF.y);
+    ctx.quadraticCurveTo(midF.x, midF.y, shF.x, shF.y);      // chest
+    ctx.quadraticCurveTo(crown.x, crown.y, shB.x, shB.y);    // shoulder
+    ctx.quadraticCurveTo(midB.x, midB.y, hipB.x, hipB.y);    // back
+    ctx.quadraticCurveTo(seat.x, seat.y, hipF.x, hipF.y);    // seat
+    ctx.closePath();
+    ctx.fillStyle = C.top;
+    ctx.fill();
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 13;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+
+  function drawArm(pose, a, color, dx, dy, w1, w2) {
+    const s = { x: pose.sh.x + dx * 0.5, y: pose.sh.y + dy * 0.5 };
+    const e = { x: a.elbow.x + dx, y: a.elbow.y + dy };
+    const w = { x: a.wrist.x + dx, y: a.wrist.y + dy };
+    limb([s, e, w], [w1, w2], color);
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, w2 * 0.62, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 9;
+    ctx.stroke();
+  }
+
+  function drawShoe(x, palette) {
+    const t = GROUND - 58;                     // top of the shoe
+    ctx.beginPath();
+    ctx.moveTo(x - 36, t + 8);                                        // ankle collar
+    ctx.quadraticCurveTo(x - 60, GROUND - 42, x - 50, GROUND - 24);    // heel
+    ctx.quadraticCurveTo(x - 10, GROUND - 16, x + 42, GROUND - 20);    // underfoot
+    ctx.quadraticCurveTo(x + 76, GROUND - 26, x + 70, GROUND - 44);    // toe box
+    ctx.quadraticCurveTo(x + 56, GROUND - 58, x + 14, t + 2);          // instep
+    ctx.quadraticCurveTo(x - 14, t - 4, x - 36, t + 8);                // collar
+    ctx.closePath();
+    ctx.fillStyle = palette.body;
+    ctx.fill();
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 12;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // sole
+    ctx.beginPath();
+    ctx.roundRect(x - 48, GROUND - 22, 122, 22, 9);
+    ctx.fillStyle = palette.sole;
+    ctx.fill();
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 9;
+    ctx.stroke();
+
+    // lace hint
+    ctx.beginPath();
+    ctx.moveTo(x + 4, t + 6);
+    ctx.lineTo(x + 28, GROUND - 34);
+    ctx.strokeStyle = 'rgba(44,35,52,.35)';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+  }
+
+  function drawLeg(pose, ankle, knee, color, palette) {
+    limb([pose.hip, knee, ankle], [52, 44], color);
+    drawShoe(ankle.x, palette);
+  }
+
+  function drawHead(pose, sway) {
+    const { headC } = pose;
+    const cx = headC.x, cy = headC.y, r = HEAD_R;
+
+    // ponytail, behind the head
+    const bx = cx - r * 0.72, by = cy - r * 0.28;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.bezierCurveTo(
+      bx - 56, by + 2,
+      bx - 96, by + 54 + sway * 0.5,
+      bx - 92, by + 116 + sway
+    );
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 42;
+    ctx.stroke();
+    ctx.strokeStyle = C.hair;
+    ctx.lineWidth = 29;
+    ctx.stroke();
+
+    // skull
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = C.skin;
+    ctx.fill();
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 10;
+    ctx.stroke();
+
+    // hair: a thick mass over the skull with a swept hairline
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 13, -0.42, -3.92, true);
+    ctx.quadraticCurveTo(cx - r * 0.10, cy - r * 0.02, cx + r * 0.86, cy - r * 0.46);
+    ctx.closePath();
+    ctx.fillStyle = C.hair;
+    ctx.fill();
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 10;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // hair shine
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.04, cy - r * 0.16, r * 0.68, -2.45, -1.95);
+    ctx.strokeStyle = 'rgba(255,255,255,.22)';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+
+    // eye
+    ctx.beginPath();
+    ctx.ellipse(cx + r * 0.36, cy - r * 0.04, 7, 9.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = C.ink;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + r * 0.36 - 2.2, cy - r * 0.04 - 3, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.fill();
+
+    // brow
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.16, cy - r * 0.34);
+    ctx.quadraticCurveTo(cx + r * 0.36, cy - r * 0.46, cx + r * 0.58, cy - r * 0.34);
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // blush
+    ctx.beginPath();
+    ctx.ellipse(cx + r * 0.46, cy + r * 0.34, 13, 7.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,110,120,.30)';
+    ctx.fill();
+
+    // smile
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.34, cy + r * 0.40);
+    ctx.quadraticCurveTo(cx + r * 0.56, cy + r * 0.58, cx + r * 0.78, cy + r * 0.26);
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 7;
+    ctx.stroke();
+
+    // nose
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.90, cy - r * 0.02);
+    ctx.quadraticCurveTo(cx + r * 1.22, cy + r * 0.20, cx + r * 0.86, cy + r * 0.34);
+    ctx.fillStyle = C.skin;
+    ctx.fill();
+    ctx.lineWidth = 7;
+    ctx.stroke();
+  }
+
+  // ---- scene ----------------------------------------------------------------
+  function drawBackground(pose) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#fff1e2');
+    g.addColorStop(0.62, '#ffddc3');
+    g.addColorStop(1, '#ffcbb1');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.beginPath();
+    ctx.arc(520, 320, 250, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(70, GROUND + 3);
+    ctx.lineTo(W - 70, GROUND + 3);
+    ctx.strokeStyle = 'rgba(94,60,84,.16)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    const spread = 172 + 44 * pose.q;
+    const shadow = ctx.createRadialGradient(496, GROUND + 8, 6, 496, GROUND + 8, spread);
+    shadow.addColorStop(0, 'rgba(74,44,66,.28)');
+    shadow.addColorStop(1, 'rgba(74,44,66,0)');
+    ctx.beginPath();
+    ctx.ellipse(496, GROUND + 8, spread, 24, 0, 0, Math.PI * 2);
+    ctx.fillStyle = shadow;
+    ctx.fill();
+  }
+
+  function draw(pose, sway) {
+    drawBackground(pose);
+
+    drawArm(pose, pose.far, C.skinS, -16, 8, 26, 23);
+    drawLeg(pose, pose.ankleF, pose.kneeF, C.legsS, { body: C.shoeS, sole: C.soleS });
+    drawTorso(pose);
+
+    // neck
+    limb([on(pose.sh, pose.u, 2), on(pose.sh, pose.u, 40)], [34, 32], C.skin);
+
+    drawHead(pose, sway);
+
+    drawLeg(pose, pose.ankleN, pose.kneeN, C.legs, { body: C.shoe, sole: C.sole });
+    drawArm(pose, pose.near, C.skin, 6, 2, 30, 26);
+  }
+
+  // ---- loop -----------------------------------------------------------------
+  let sway = 0, qPrev = 0, last = performance.now();
+  let view = [1, 0, 0, 1, 0, 0];
+
+  function frame(now) {
+    const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
+    last = now;
+
+    const t = frozen === null ? now / 1000 : parseFloat(frozen);
+    const pose = poseAt(t);
+
+    // ponytail lags the vertical motion
+    if (frozen === null) {
+      sway += ((qPrev - pose.q) * 340 - sway) * Math.min(1, dt * 9);
+      qPrev = pose.q;
+    } else {
+      sway = 0;
+    }
+
+    ctx.setTransform(...view);
+    draw(pose, sway);
+    requestAnimationFrame(frame);
+  }
+
+  function fit() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = cv.clientWidth || W, h = cv.clientHeight || H;
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    const s = Math.min(cv.width / W, cv.height / H);
+    view = [s, 0, 0, s, (cv.width - W * s) / 2, (cv.height - H * s) / 2];
+  }
+
+  window.addEventListener('resize', fit);
+  fit();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

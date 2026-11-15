@@ -1,0 +1,84 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>stage</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #game { width: 100vw; height: 100vh; display: block; }
+</style>
+<canvas id="game"></canvas>
+<script type="module">
+import { LEVEL } from '../src/level.js';
+import { createGame } from '../src/game.js';
+
+const scene = new URLSearchParams(location.search).get('scene') || 'title';
+const g = createGame(document.getElementById('game'), LEVEL);
+g.resize();
+
+const W = g.world;
+const wheelRect = { x: 2680, y: 520, w: 170, h: 170 };
+const wallRect = { x: 840, y: 400, w: 340, h: 440 };
+
+function go() {
+  if (scene === 'title') {
+    g.game.state = 'title';
+    return;
+  }
+
+  g.startRun();
+
+  if (scene === 'wall') {
+    g.player.place(700, 726);
+    g.cam.x = 0;
+    return;
+  }
+
+  if (scene === 'gap') {
+    W.progress.scene1 = true;
+    W.commitCut(wallRect);
+    g.player.place(1560, 726);
+    g.player.vx = 0;
+    g.cam.x = 760;
+    W.time = 36;                       // dolly has run to the far end
+    return;
+  }
+
+  if (scene === 'final' || scene === 'won') {
+    W.progress.scene1 = true;
+    W.progress.scene2 = true;
+    W.commitCut(wallRect);
+    // park the load on the sensor, then cut the drive wheel
+    W.time = 25.38;
+    W.commitCut(wheelRect);
+    g.game.visual.sensor = 1;
+    g.game.visual.shutter = 1;
+    g.player.place(3020, 726);
+    g.cam.x = 2060;
+
+    if (scene === 'won') {
+      g.game.state = 'won';
+      g.game.stats = { time: 214, blades: 2, tape: 7.4 };
+      g.player.place(3660, 726);
+      g.cam.x = 2280;
+    }
+    return;
+  }
+
+  if (scene === 'pause') {
+    g.game.state = 'paused';
+    g.player.place(700, 726);
+    g.cam.x = 0;
+    return;
+  }
+
+  if (scene === 'touch') {
+    g.input.touchMode = true;
+    g.player.place(700, 726);
+    g.cam.x = 0;
+    return;
+  }
+}
+
+go();
+g.draw(performance.now());
+document.title = 'ready';
+</script>
