@@ -762,7 +762,7 @@ function drawHUD(ctx, s) {
 
   // hints (keyboard layout) or a touch note
   if (input.touchMode) {
-    text(ctx, 'DRAG ON THE STAGE TO CUT', 960, 944, 15, 'rgba(255,241,222,.55)', 'center');
+    text(ctx, 'DRAG ON THE STAGE TO CUT', 960, 944, 15, 'rgba(58,48,38,.55)', 'center');
     return;
   }
 
