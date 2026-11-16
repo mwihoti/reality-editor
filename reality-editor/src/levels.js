@@ -267,7 +267,11 @@ export const LEVELS = [
     dolly: { from: 700, to: 1500, startTime: 20, speed: 40 },
     plate: { x: 700, w: 360 },
     relay: { x: 1300 },
-    gates: [{ x: 1700, period: 7, phase: 0.65 }],
+    // the finale's gate: a short period and a long dwell, phased so the bar is
+    // down as you arrive off the pad dash but lifts within about a second.
+    // It used to hold a 2.4s block on a 7s cycle right where the dash ends,
+    // which dominated the whole scene.
+    gates: [{ x: 1700, period: 5, hold: 0.55, phase: 0.45 }],
     ledges: [[2500, 1000, 600]],
     lift: { x: 2300, w: 200, up: 594, down: 820 },
     exitX: 2750, exitY: 600,

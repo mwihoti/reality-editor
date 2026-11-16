@@ -166,6 +166,30 @@ The gate test learns the phase instead of assuming it: it derives the bar's lowe
 the motion, checks the player is stopped while the bar is down, then checks the dwell actually
 lets them through. That pair is what would have caught the decorative gate in the first place.
 
+## Finale gate tuning, and how the obstacles actually time out
+
+A timeline probe of LAST TAKE through the bot's own policy showed **12 seconds pinned at
+the gate** (x=1656, t=8.5→20.5) with the bar's bottom hovering at 733 against a 726 head.
+Two causes, only one of them the scene's:
+
+- The bot rewound *into* the same blocked frames, walked forward, and repeated — 4 tape
+spent without moving an inch. Gates now wait: the bar lifts on its own every cycle, so
+standing is the reliable answer and scrubbing at a gate is now pointless.
+- The finale's gate was `period 7, hold 0.42, phase 0.65`: a 2.4s block landing right where
+the pad dash ends. Now `period 5, hold 0.55, phase 0.45` — down as you arrive, lifting
+within about a second, blocked for only 1.3s of every 5.
+
+Scene 9 went **38.7s → 21.0s** (tape 22.0 → 26.1); scene 2 went 28.7s → 8.0s because the
+spin was most of its time.
+
+### Hand-play at real speed (foreground tab, 60.4fps, inputs through the real loop)
+
+| obstacle | measured |
+| --- | --- |
+| pad door, SCAFFOLD | 2.02s of R when started 260px out; ~0.7s from the door itself; 0.5s dash. Scene cleared in 5.97s |
+| gate, THE CLEARING | 1.92s standing at the bar, then straight through. Scene cleared in 7.96s |
+| lift, THE STREAM | 1.07s wait for it to descend, 2.25s ride, then step off. Scene cleared in 12.71s |
+
 ## The gate that would not open
 
 Reported as "the gate does not open". Measured in the running page with real key events: in

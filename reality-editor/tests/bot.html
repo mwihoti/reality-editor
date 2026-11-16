@@ -128,9 +128,10 @@ function solve(index) {
       cut = union(crates.map(p => W.stateAt(p, W.time)));
       cutCool = 0.5;
     } else if (gateBlocks) {
-      // the gate holds itself up for part of every cycle, so scrub for it only
-      // while the tape is plentiful; otherwise just stand and let it lift
-      if (W.tape > 22 && W.time > 2) keys.add('KeyR');
+      // The bar lifts on its own every cycle, so standing is the reliable
+      // answer. Scrubbing here used to fight the cycle: rewind into the same
+      // blocked frames, step forward, repeat — twelve seconds and 4 tape at
+      // the finale's gate without the player moving an inch.
     } else if (relayAhead) {
       if (!W.plateHeld()) {
         pullExtra = 0;
