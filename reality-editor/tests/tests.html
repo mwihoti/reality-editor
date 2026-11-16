@@ -214,6 +214,29 @@ press('KeyD'); steps(150); release('KeyD'); steps(2);
 ok('the player reaches the far stage', g.player.x > 2120, `x=${g.player.x.toFixed(0)}`);
 ok('scene two is marked cleared', g.world.progress.scene2 === true);
 
+// ---- E2. the ride survives scrubbing, and a deep rewind can't strand it ----
+g.startRun();
+g.player.place(1560, 726);
+press('KeyR'); steps(900); release('KeyR'); steps(2);   // rewind well past the take
+const parkedX = dollyX();
+ok('a deep rewind parks the dolly at the ledge', parkedX < 1640, `x=${parkedX.toFixed(0)}`);
+
+g.player.place(parkedX + 60, 726);
+steps(6);
+ok('the player can board the parked dolly', g.player.groundId === 'dolly',
+  `ground=${g.player.groundId} y=${g.player.y.toFixed(0)}`);
+
+const boardRide = g.player.x;
+steps(360);
+ok('boarding a parked dolly starts the ride',
+  dollyX() > parkedX + 60 && g.player.x > boardRide + 40,
+  `dolly ${parkedX.toFixed(0)}->${dollyX().toFixed(0)} player +${(g.player.x - boardRide).toFixed(0)}`);
+
+press('KeyR'); steps(40); release('KeyR'); steps(4);
+ok('the dolly stays under your feet while you scrub',
+  Math.abs(g.player.y - 726) < 8 && g.player.groundId === 'dolly',
+  `y=${g.player.y.toFixed(0)} ground=${g.player.groundId}`);
+
 // ---- F. puzzle 3: the final edit -----------------------------------------
 g.startRun();
 g.player.place(2900, 726);
@@ -303,8 +326,8 @@ g.startRun();
 const gapX = g.world.stateAt(dolly, g.world.time).x + 100;
 g.player.place(gapX, 1300);
 steps(60);
-ok('falling respawns at the last ledge',
-  Math.abs(g.player.x - 1300) < 4 && Math.abs(g.player.y - 726) < 3,
+ok('falling respawns at the last checkpoint',
+  Math.abs(g.player.x - 1560) < 4 && Math.abs(g.player.y - 726) < 3,
   `x=${g.player.x.toFixed(0)} y=${g.player.y.toFixed(0)}`);
 
 document.getElementById('out').textContent = out.join('\n');

@@ -156,8 +156,9 @@ export function createGame(canvas, level) {
     const t0 = world.time;
     world.update(dt, frameInput);
 
-    // 2. a moving platform carries the player while it runs forward
-    if (!world.rewinding && player.groundId) {
+    // 2. a moving platform carries the player in both directions, so riding the
+    //    dolly back while scrubbing behaves like riding it forward
+    if (player.groundId) {
       const p = world.byId(player.groundId);
       if (p && p.motion) {
         const a = world.stateAt(p, world.time);
@@ -168,13 +169,21 @@ export function createGame(canvas, level) {
     }
 
     // 3. the player: off-tape, always forward
-    const solids = world.solids();
+    const solids = world.solids(player.groundId);
     if (jumpPressed && (player.onGround || player.coyote > 0)) audio.jump();
     player.update(dt, frameInput, solids);
     player.depenetrate(solids);
 
     if (!wasGround && player.onGround) audio.land();
     wasGround = player.onGround;
+
+    // boarding a parked dolly starts its take from that moment (see stateAt)
+    if (player.groundId === 'dolly' && world.dollyBoard === null) {
+      const d = world.byId('dolly');
+      if (d && d.motion && world.stateAt(d, world.time).x <= d.motion.from + 1) {
+        world.dollyBoard = world.time;
+      }
+    }
 
     // 4. cutting
     if (input.releasedRect) {

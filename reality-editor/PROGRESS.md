@@ -49,20 +49,39 @@ Run the tests: `tests/run-tests.sh` (headless Chromium + Node).
 
 ```
 == deterministic suite (tests.html) ==
-ok   TESTS PASS 72/72
+ok   TESTS PASS 76/76
 == real animation-frame loop (loop.html) ==
-     frames=300 state=playing moved=true cut=true rewinding=true x=250.9 time=22.11 tape=24.98 blades=4
+     frames=176 state=playing moved=true cut=true rewinding=true x=250.9 time=18.08 tape=22.47 blades=4
 ok   the game runs on real requestAnimationFrame frames
 RESULT: PASS
 ```
 
 The real-loop check runs the actual `main.js` animation loop in headless Chromium over CDP (no manual stepping), holds real keys, cuts, and rewinds.
 
-The 72 assertions cover: boot/start, walk, jump, landing, drag-cut pruning, cut eligibility by prop anchor, blade spend/refund/exhaustion, rewind rate (1.6x +-0.06 measured 1.58), tape spend and floor, restore-on-rewind, re-apply-on-play, pure prop motion, moving props ghosting while rewinding, player not rewound, all three puzzles end to end, shutter/sensor state, win state, pause freeze, restart, start button, and fall respawn.
+The 76 assertions cover: boot/start, walk, jump, landing, drag-cut pruning, cut eligibility by prop anchor, blade spend/refund/exhaustion, rewind rate (1.6x +-0.06 measured 1.58), tape spend and floor, restore-on-rewind, re-apply-on-play, pure prop motion, moving props ghosting while rewinding, player not rewound, all three puzzles end to end, shutter/sensor state, win state, pause freeze, restart, start button, and fall respawn.
 
 Screenshots: `shot-title.png`, `shot-wall.png`, `shot-gap.png`, `shot-final.png`, `shot-won.png`, `shot-pause.png`, `shot-touch.png` (produced from `tests/stage.html`, which sets up each state and draws it).
 
 Recording: `gameplay.webm` (VP9, 1280x577, ~36s) — a bot (`tests/demo.html`) plays the real game: the title, the wall cut, rewinding the dolly back and riding it, then rewinding the load onto the sensor and cutting the drive wheel, ending as the exit shutter lifts. It does **not** capture the final walk through the door; the win card is in `shot-won.png` and in the test suite.
+
+## Gap fixes from playtesting (scene 2)
+
+A player reported being unable to cross the gap. Three separate faults, all fixed:
+
+1. **The dolly vanished from collision while you scrubbed.** Moving props are ghosts during a
+   rewind, so the platform under your feet stopped being solid the moment you held R, and you
+   fell through it. The prop you are standing on now stays solid (`solids(groundedOn)`), and the
+   carry runs backwards too, so riding the dolly back while rewinding works.
+2. **A deep rewind stranded the dolly at the ledge, motionless.** The dolly is parked at the
+   ledge for every clock time before its take, so boarding it after a long rewind left you
+   standing on a platform that would not move for seconds. Boarding a parked dolly now starts
+   its run from that moment (`world.dollyBoard`).
+3. **Falling in the gap cost 320px of walking.** There is now a checkpoint on the near ledge
+   (x=1560), so a fall puts you back at the gap in under a second.
+
+A riding hint (`STAND STILL — IT CARRIES YOU`) appears while you stand on the dolly. Walking
+forward off its front edge mid-ride is still a fall — the checkpoint makes it cheap, and the
+hint tells you not to.
 
 ## Tuning findings from playing it through
 

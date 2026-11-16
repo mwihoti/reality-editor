@@ -26,6 +26,7 @@ export const LEVEL = {
   checkpoints: [
     { x: 170, y: 726 },
     { x: 1300, y: 726 },
+    { x: 1560, y: 726 },   // the near ledge, so falling in the gap is cheap
     { x: 2150, y: 726 },
     { x: 2950, y: 726 }
   ],

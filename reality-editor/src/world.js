@@ -18,6 +18,7 @@ export class World {
     this.tape = CONFIG.rules.maxTape;
     this.cuts = [];
     this.rewinding = false;
+    this.dollyBoard = null;
     this.fx = [];
     this.toasts = [];
     this.progress = { scene1: false, scene2: false, won: false };
@@ -57,7 +58,11 @@ export class World {
     } else if (m.type === 'linear') {
       const lo = Math.min(m.from, m.to);
       const hi = Math.max(m.from, m.to);
-      out.x = clamp(m.from + m.speed * (t - m.startTime), lo, hi);
+      // The dolly parks at the ledge once the clock is rewound past its take.
+      // If the player boards it there, the take resumes from that moment, so
+      // stepping on always starts the ride instead of waiting for the clock.
+      const base = (p.id === 'dolly' && this.dollyBoard !== null) ? this.dollyBoard : m.startTime;
+      out.x = clamp(m.from + m.speed * (t - base), lo, hi);
     }
     return out;
   }
@@ -134,13 +139,14 @@ export class World {
   }
 
   // ---- collision ----------------------------------------------------------
-  solids() {
+  solids(groundedOn = null) {
     const list = [];
     for (const p of this.level.props) {
       if (!p.solid || !this.alive(p)) continue;
       if (p.kind === 'shutter' && this.exitOpen()) continue;
-      // during rewind the footage is a ghost: it cannot drag or crush you
-      if (p.motion && this.rewinding) continue;
+      // during rewind the footage is a ghost: it cannot drag or crush you —
+      // except the thing you are standing on, which must not vanish underfoot
+      if (p.motion && this.rewinding && p.id !== groundedOn) continue;
       const s = this.stateAt(p, this.time);
       list.push({ id: p.id, x: s.x, y: s.y, w: s.w, h: s.h, moving: !!p.motion });
     }

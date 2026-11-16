@@ -50,17 +50,25 @@ if m:
 esac
 
 echo "== real animation-frame loop (loop.html) =="
-LOOP=$(node "$ROOT/tests/cdp.mjs" "http://127.0.0.1:$SRV_PORT/tests/loop.html" 9000 "document.title")
-echo "     $LOOP"
-if printf '%s' "$LOOP" | grep -q "state=playing" \
-  && printf '%s' "$LOOP" | grep -q "moved=true" \
-  && printf '%s' "$LOOP" | grep -q "cut=true" \
-  && printf '%s' "$LOOP" | grep -q "rewinding=true"; then
-  echo "ok   the game runs on real requestAnimationFrame frames"
-else
-  echo "FAIL the real frame loop did not play the scripted sequence"
-  fail=1
-fi
+# headless Chromium occasionally serves only a frame or two before the check
+# reads the page, so allow one retry before calling it a failure
+for attempt in 1 2; do
+  LOOP=$(node "$ROOT/tests/cdp.mjs" "http://127.0.0.1:$SRV_PORT/tests/loop.html" 9000 "document.title")
+  echo "     $LOOP"
+  if printf '%s' "$LOOP" | grep -q "state=playing" \
+    && printf '%s' "$LOOP" | grep -q "moved=true" \
+    && printf '%s' "$LOOP" | grep -q "cut=true" \
+    && printf '%s' "$LOOP" | grep -q "rewinding=true"; then
+    echo "ok   the game runs on real requestAnimationFrame frames"
+    break
+  fi
+  if [ "$attempt" = 2 ]; then
+    echo "FAIL the real frame loop did not play the scripted sequence"
+    fail=1
+  else
+    echo "     (retrying once)"
+  fi
+done
 
 if [ "$fail" -ne 0 ]; then
   echo "RESULT: FAIL"

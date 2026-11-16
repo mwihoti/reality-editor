@@ -563,6 +563,14 @@ function drawCutUI(ctx, world, input, cam, now) {
 function hintFor(world, player) {
   const px = player.x + player.w / 2;
 
+  if (player.groundId === 'dolly' && !world.progress.scene2) {
+    return {
+      x: px, y: 470, anchor: 'down',
+      lines: ['STAND STILL \u2014 IT CARRIES YOU'],
+      sub: 'step off when it reaches the far side'
+    };
+  }
+
   if (!world.progress.scene1 && px < 1500) {
     return {
       x: 1010, y: 300, anchor: 'down',

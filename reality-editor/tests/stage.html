@@ -63,6 +63,16 @@ function go() {
     return;
   }
 
+  if (scene === 'ride') {
+    W.progress.scene1 = true;
+    W.commitCut(wallRect);
+    g.player.place(1700, 726);
+    W.dollyBoard = W.time;
+    for (let i = 0; i < 12; i++) g.step(1 / 120);
+    g.cam.x = 1360;
+    return;
+  }
+
   if (scene === 'pause') {
     g.game.state = 'paused';
     g.player.place(700, 726);
