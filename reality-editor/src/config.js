@@ -32,7 +32,10 @@ export const CONFIG = {
   // relayGrace: seconds of forward time a pressure-plate door stays open after
   // the weight leaves the pad. Without it the door shuts on the same frame the
   // rewind ends, so stopping the scrub the moment it opens gives you no runway.
-  mechanism: { sensorHalfWindow: 80, sensorLoadDisplay: 0.9, relayGrace: 3 },
+  // sensorHalfWindow is the trigger zone's half-width; it must match the sensor
+  // pad's half-width (84/2 in levels.js). At 80 it lit LOADED while the crate
+  // visibly hung beside the pad.
+  mechanism: { sensorHalfWindow: 42, sensorLoadDisplay: 0.9, relayGrace: 3 },
 
   feel: {
     cutFlash: 0.22,

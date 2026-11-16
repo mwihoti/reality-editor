@@ -237,6 +237,7 @@ scenes is clamped so CONTINUE names the last real scene, and pressing it starts 
 
 - **Tape was too short.** The intended route costs roughly 6s of tape rewinding the dolly and 7s parking the load, and the bot run with a 20s budget ran dry inside scene 3. `maxTape` is now **30**, which keeps the pressure without making the last puzzle unaffordable.
 - **Cutting during a rewind is rejected** (`commitCut` returns `reason: 'rewinding'`), so the wheel has to be cut right after letting go of R — that is the intended beat, but it is worth a clearer HUD nudge if playtests show people missing it.
+- **The sensor lied about the load.** `sensorHalfWindow` was 80, but the sensor pad is only 84 wide (±42), so “SENSOR: LOADED” lit — and `exitOpen()` could be satisfied — while the crate visibly hung beside the pad, overlapping it by as little as 4px in the world units of the playthrough video. The value was the pad’s full width mistaken for a half-window. It is now **42**, the pad’s true half-width: the sensor only reads LOADED with the crate’s center over the pad. The hoist is harder to finish (the cut now has to land in a 1.9s forward window instead of 3.5s), but the bot still clears it and the suite passes 123/123.
 
 ## Known limits / blockers
 
@@ -244,7 +245,7 @@ scenes is clamped so CONTINUE names the last real scene, and pressing it starts 
 - Audio was not listened to — it is synthesised and was only verified not to throw. Levels need a human ear.
 - Touch layout is drawn and wired but was not exercised on a real touch device.
 - The win state is reachable only through the intended puzzle order (the corridor is gated); if a player exhausts all tape in scene 3 they restart with Backspace, which is always available.
-- The sensor window in scene 3 is generous (80px), but the load leaves it again as soon as the clock runs forward, so the cut has to land while the load is parked over the pad.
+- The sensor window in scene 3 is the pad’s own width (42px half-window), and the load leaves it as soon as the clock runs forward, so the cut has to land while the load is parked over the pad.
 - Save data is per browser and per origin. Local progress under `localhost:8124` does not
 carry over to the itch embed, which runs on a different origin.
 - The save has no in-game reset button yet; clearing site data is the only wipe.
