@@ -204,7 +204,9 @@ export const LEVELS = [
   makeLevel({
     label: 'SCAFFOLD', theme: 'urban', width: 2900,
     floors: [[-160, 3060]],
-    dolly: { from: 700, to: 1500, startTime: 20, speed: 90 },
+    // 40, not 90: the dolly has to leave the pad only just before the player
+    // arrives, so one tap of R puts it back on and the door opens
+    dolly: { from: 700, to: 1500, startTime: 20, speed: 40 },
     plate: { x: 700, w: 360 },
     relay: { x: 1200 },
     exitX: 1400,
@@ -235,7 +237,9 @@ export const LEVELS = [
   makeLevel({
     label: 'THE ALLEY', theme: 'town', width: 2900,
     floors: [[-160, 3060]],
-    dolly: { from: 700, to: 1500, startTime: 20, speed: 90 },
+    // 40, not 90: the dolly has to leave the pad only just before the player
+    // arrives, so one tap of R puts it back on and the door opens
+    dolly: { from: 700, to: 1500, startTime: 20, speed: 40 },
     plate: { x: 700, w: 360 },
     relay: { x: 1400 },
     gates: [{ x: 1900, period: 8, phase: 0.35 }],
@@ -258,10 +262,9 @@ export const LEVELS = [
   makeLevel({
     label: 'LAST TAKE', theme: 'beach', width: 3400,
     floors: [[-160, 2460]],
-    // the finale stacks three objects, so its pad is the most generous in the
-    // game: at speed 90 the door held for 4s and the run through it was down
-    // to a frame; 60 gives 6s, which leaves the dash some slack
-    dolly: { from: 700, to: 1500, startTime: 20, speed: 60 },
+    // same 40 as the other pad scenes: the dolly leaves the pad at world 29,
+    // about a second of rewind from where the player arrives
+    dolly: { from: 700, to: 1500, startTime: 20, speed: 40 },
     plate: { x: 700, w: 360 },
     relay: { x: 1300 },
     gates: [{ x: 1700, period: 7, phase: 0.65 }],

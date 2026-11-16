@@ -77,7 +77,7 @@ cd reality-editor
 ./tests/run-tests.sh
 ```
 
-119 assertions over the mechanics, all nine scenes, the progression between them, the title
+123 assertions over the mechanics, all nine scenes, the progression between them, the title
 buttons and the save file; a check that runs the real `requestAnimationFrame` loop in headless
 Chromium with real input; and a play bot (`tests/bot.html`) that drives every one of the nine
 scenes to its exit through the real input path — keys for walking and rewinding, a real

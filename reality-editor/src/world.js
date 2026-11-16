@@ -18,6 +18,7 @@ export class World {
     this.tape = CONFIG.rules.maxTape;
     this.cuts = [];
     this.rewinding = false;
+    this.plateGrace = Infinity;   // no plate pressed yet: the relay stays shut
     this.dollyBoard = null;
     this.rescue = false;
     this.fx = [];
@@ -51,6 +52,15 @@ export class World {
     } else if (!(input.rewind && this.time <= 0.0001)) {
       // holding rewind at the head of the tape parks the clock
       this.time += dt;
+    }
+
+    // A relay door is hydraulic: it holds open for a moment after the weight
+    // leaves the pad. Otherwise the plate window's last frame is also its last
+    // open frame, and stopping the rewind the instant the door opens shuts it
+    // in your face — which reads as "the gate does not open".
+    if (this.byIdmap.has('plate')) {
+      if (this.plateHeld()) this.plateGrace = 0;
+      else if (!this.rewinding) this.plateGrace += dt;
     }
 
     // Rescue valve: tape only comes back once it is completely spent, so a
@@ -161,7 +171,9 @@ export class World {
 
   shutterOpen(p) {
     if (!p) return true;
-    if (p.kind === 'relay') return this.plateHeld();
+    if (p.kind === 'relay') {
+      return this.plateHeld() || this.plateGrace < CONFIG.mechanism.relayGrace;
+    }
     return this.exitOpen();
   }
 

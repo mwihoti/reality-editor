@@ -460,6 +460,22 @@ ok('the finale is a gate + pad + lift scene',
   && !!g2.world.byId('plate') && !!g2.world.byId('lift'),
   g2.world.level.label);
 ok('the finale has no load line to open', g2.world.exitOpen() && !g2.world.hasMechanism());
+
+// the relay door: shut at the start, opened by weight, and held open for a
+// moment afterwards so the door doesn't shut on the frame the rewind ends
+const relayDoor = g2.world.byId('relay');
+ok('the relay door is shut before the pad is pressed', !g2.world.shutterOpen(relayDoor));
+g2.world.time = 25;                    // the dolly is back on the pad
+g2.player.place(1000, 726);
+st2(2);
+ok('the pad opens the relay door', g2.world.shutterOpen(relayDoor));
+g2.world.time = 40;                    // the dolly has long since rolled off
+st2(120);                              // one second of forward time
+ok('the relay door stays open a moment after the weight leaves',
+  g2.world.shutterOpen(relayDoor));
+st2(480);                              // four more seconds
+ok('...and then it shuts', !g2.world.shutterOpen(relayDoor));
+
 g2.player.place(g2.level.exit.x + 120, (g2.level.exit.doorY ?? 820) - 94);
 st2(6);
 ok('finishing the last scene ends the run', g2.state === 'won',

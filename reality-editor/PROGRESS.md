@@ -166,6 +166,28 @@ The gate test learns the phase instead of assuming it: it derives the bar's lowe
 the motion, checks the player is stopped while the bar is down, then checks the dwell actually
 lets them through. That pair is what would have caught the decorative gate in the first place.
 
+## The gate that would not open
+
+Reported as "the gate does not open". Measured in the running page with real key events: in
+SCAFFOLD, standing at the relay door and holding R for two full seconds left it shut. The pad
+dolly only got back on the pad at world 24 — 6.2 world-seconds behind the player's arrival at
+30.2, i.e. ~3.9s of holding — and the instant it opened was the window's *closing* edge, so
+letting go when the door opened shut it again on the same frame. Two changes:
+
+- The pad dolly rolls at 40 instead of 90 (all three pad scenes). It now leaves the pad at world
+29, about a second in front of the player, so a 0.72s hold puts it back: door opens in every pad
+scene for 0.7 tape instead of 3.9.
+- The relay door is hydraulic: it holds open for `CONFIG.mechanism.relayGrace` (3s) of forward
+time after the weight leaves the pad. Stopping the rewind the instant the door opens now leaves
+runway to run instead of zero frames.
+
+Measured after: shut on arrival in all three pad scenes, opens after 0.72s of R, crossed 0.60s
+later with the door never shutting mid-dash. Tests pin the latch (shut before the pad, open on
+weight, still open a second after it leaves, shut after four).
+
+Scene 2's gate was checked the same way and is not the culprit: in the live page the bar drops to
+the floor on arrival and rises clear after ~0.8s of R, and the player walks through.
+
 ## The crash that stopped cuts working, and the bot that now guards it
 
 - `game.js` read `level.drive.id` on every successful cut. Only the studio and the hoist

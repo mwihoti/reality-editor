@@ -29,7 +29,10 @@ export const CONFIG = {
   // the whole room, which is too harsh for a mistake in the last scene.
   rules: { maxCuts: 4, maxTape: 30, rewindRate: 1.6, startTime: 30, tapeRefill: 0.4 },
 
-  mechanism: { sensorHalfWindow: 80, sensorLoadDisplay: 0.9 },
+  // relayGrace: seconds of forward time a pressure-plate door stays open after
+  // the weight leaves the pad. Without it the door shuts on the same frame the
+  // rewind ends, so stopping the scrub the moment it opens gives you no runway.
+  mechanism: { sensorHalfWindow: 80, sensorLoadDisplay: 0.9, relayGrace: 3 },
 
   feel: {
     cutFlash: 0.22,
