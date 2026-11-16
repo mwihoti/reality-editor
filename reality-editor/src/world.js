@@ -19,12 +19,24 @@ export class World {
     this.cuts = [];
     this.rewinding = false;
     this.dollyBoard = null;
+    this.rescue = false;
     this.fx = [];
     this.toasts = [];
     this.progress = { scene1: false, scene2: false, won: false };
   }
 
   byId(id) { return this.byIdmap.get(id); }
+
+  // Each level is a fresh set: new props, same rules.
+  setLevel(level) {
+    this.level = level;
+    this.byIdmap = new Map(level.props.map(p => [p.id, p]));
+    this.reset();
+  }
+
+  hasMechanism() {
+    return !!(this.level.drive && this.level.load && this.level.sensorCX != null);
+  }
 
   // ---- footage clock ------------------------------------------------------
   update(dt, input) {
@@ -41,9 +53,13 @@ export class World {
       this.time += dt;
     }
 
-    // the take records while it plays, so spent tape comes back slowly
-    if (!canRewind) {
+    // Rescue valve: tape only comes back once it is completely spent, so a
+    // mistake near the end of a run can't end the run, but the budget still
+    // bites for every rewind you make while any tape remains.
+    if (this.tape <= 0.0001) this.rescue = true;
+    if (this.rescue && !canRewind) {
       this.tape = Math.min(CONFIG.rules.maxTape, this.tape + dt * CONFIG.rules.tapeRefill);
+      if (this.tape >= CONFIG.rules.maxTape) this.rescue = false;
     }
 
     const now = performance.now() / 1000;
@@ -82,6 +98,7 @@ export class World {
   // ---- puzzle 3 mechanism -------------------------------------------------
   // The drive wheel freezes the load line at the moment it was cut.
   driveCutTime() {
+    if (!this.level.drive) return Infinity;
     let t = Infinity;
     for (const c of this.cuts) {
       if (c.t <= this.time && c.ids.indexOf(this.level.drive.id) !== -1) t = Math.min(t, c.t);
@@ -98,12 +115,14 @@ export class World {
 
   loadCX() {
     const L = this.level.load;
+    if (!L) return null;
     const t = this.lineTime();
     const cx = L.anchorCX - L.speed * (CONFIG.rules.startTime - t);
     return clamp(cx, L.minCX, L.anchorCX);
   }
 
   sensorLoaded() {
+    if (!this.hasMechanism()) return true;   // no load line: the exit is simply open
     return Math.abs(this.loadCX() - this.level.sensorCX) <= CONFIG.mechanism.sensorHalfWindow;
   }
 

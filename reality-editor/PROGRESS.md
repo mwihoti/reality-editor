@@ -112,6 +112,6 @@ while you hold R nothing refills.
 
 ## Next steps
 
-1. Play the three scenes by hand and tune tape/blade numbers (config only).
+1. Play all nine scenes by hand and tune tape/blade numbers (config only).
 2. Add a second room if the mechanics hold up.
 3. Start the Unreal port from `UNREAL_PORT_PLAN.md`.

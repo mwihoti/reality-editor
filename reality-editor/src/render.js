@@ -1,6 +1,7 @@
 // Canvas painting: stage, props, player, cut UI, HUD, screens, rewind treatment.
 
 import { CONFIG } from './config.js';
+import { paintTheme } from './themes.js';
 
 const P = {
   ink: '#241d2e',
@@ -87,7 +88,9 @@ export function render(ctx, view, s) {
   drawHUD(ctx, s);
   if (input.touchMode) drawTouch(ctx, input);
   if (game.state === 'paused') drawPause(ctx, game, input);
-  if (game.state === 'won') drawWon(ctx, game, input);
+  if (game.state === 'won' || game.state === 'cleared') {
+    drawWon(ctx, game, input, game.state === 'cleared');
+  }
 
   ctx.restore();
 }
@@ -96,7 +99,7 @@ export function render(ctx, view, s) {
 function drawScene(ctx, s) {
   const { game, world, player, cam, input, now } = s;
 
-  drawBackdrop(ctx, cam, now);
+  drawBackdrop(ctx, cam, now, world.level.theme);
 
   ctx.save();
   ctx.translate(960, 540);
@@ -120,41 +123,10 @@ function drawScene(ctx, s) {
   if (game.state !== 'won') drawToasts(ctx, world, now);
 }
 
-function drawBackdrop(ctx, cam, now) {
-  const g = ctx.createLinearGradient(0, 0, 0, 1080);
-  g.addColorStop(0, '#171326');
-  g.addColorStop(0.55, '#221b38');
-  g.addColorStop(1, '#120f1d');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 1920, 1080);
+function drawBackdrop(ctx, cam, now, theme) {
+  paintTheme(ctx, theme || 'studio', cam, now);
 
-  const lx = 980 - cam.x * 0.30;
-  const light = ctx.createRadialGradient(lx, 500, 40, lx, 500, 760);
-  light.addColorStop(0, 'rgba(255,238,208,0.24)');
-  light.addColorStop(0.55, 'rgba(255,222,180,0.08)');
-  light.addColorStop(1, 'rgba(255,222,180,0)');
-  ctx.fillStyle = light;
-  ctx.fillRect(0, 0, 1920, 1080);
-
-  ctx.save();
-  ctx.globalAlpha = 0.32;
-  ctx.strokeStyle = '#3d3258';
-  ctx.lineWidth = 12;
-  const off = -((cam.x * 0.55) % 480);
-  const top = 70 + Math.sin(now * 0.7) * 3;
-  for (let i = -1; i < 6; i++) {
-    const x = off + i * 480;
-    line(ctx, x, 0, x, 260 + top);
-    ctx.beginPath();
-    ctx.moveTo(x - 26, 260 + top);
-    ctx.lineTo(x + 26, 260 + top);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(x, 276 + top, 10, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.restore();
-
+  // the dark strip under the stage floor, same in every location
   ctx.fillStyle = '#0f0c18';
   ctx.fillRect(0, 986, 1920, 94);
 }
@@ -351,6 +323,7 @@ function drawWheel(ctx, s, game) {
 
 function drawLoad(ctx, world, game) {
   const L = world.level.load;
+  if (!L) return;                        // this location has no load line
   const cx = world.loadCX();
   const railY = 516;
 
@@ -560,53 +533,35 @@ function drawCutUI(ctx, world, input, cam, now) {
 }
 
 // ---- hints ----------------------------------------------------------------
+// Hints are data on the level (level.hints), so every scene explains itself
+// without the renderer knowing which scene it is.
 function hintFor(world, player) {
   const px = player.x + player.w / 2;
+  const dolly = world.byId('dolly');
+  const dollyX = dolly && dolly.motion ? world.stateAt(dolly, world.time).x : null;
 
-  if (player.groundId === 'dolly' && !world.progress.scene2) {
+  if (player.groundId === 'dolly' && dolly && dollyX < dolly.motion.to - 60) {
     return {
       x: px, y: 470, anchor: 'down',
-      lines: ['STAND STILL \u2014 IT CARRIES YOU'],
+      lines: ['STAND STILL — IT CARRIES YOU'],
       sub: 'step off when it reaches the far side'
     };
   }
 
-  if (!world.progress.scene1 && px < 1500) {
-    return {
-      x: 1010, y: 300, anchor: 'down',
-      lines: ['DRAG A BOX OVER THE CRATES', 'TO CUT THEM OUT OF THE SCENE'],
-      sub: 'LMB drag · every crate you box disappears'
-    };
-  }
-  if (world.progress.scene1 && !world.progress.scene2 && px < 2050) {
-    return {
-      x: 1830, y: 486, anchor: 'down',
-      lines: ['HOLD R: REWIND THE DOLLY', 'BACK TO THE LEDGE'],
-      sub: 'you stand still — the room moves'
-    };
-  }
-  if (world.progress.scene2 && !world.progress.won && px > 2260) {
-    if (!world.driveRunning() && !world.exitOpen()) {
-      return {
-        x: 3120, y: 292, anchor: 'down',
-        lines: ['THE LINE IS FROZEN OFF THE SENSOR'],
-        sub: world.tape > 0.2
-          ? 'rewind past the cut — the wheel comes back'
-          : 'wait for the tape to refill, then rewind past the cut'
-      };
+  for (const h of world.level.hints || []) {
+    if (px < (h.from ?? 0) || px > (h.until ?? Infinity)) continue;
+    if (h.need === 'wall' && world.cutsUsed() > 0) continue;
+    if (h.need === 'dollyAway' && !(dollyX !== null && dollyX > dolly.motion.from + 40)) continue;
+    if (h.need === 'craneFrozen' && (world.driveRunning() || world.exitOpen())) continue;
+    if (h.need === 'craneLoaded' && !world.exitOpen()) continue;
+    if (h.need === 'crane' && (world.exitOpen() || !world.driveRunning())) continue;
+
+    let sub = h.sub;
+    if (h.need === 'craneFrozen' && world.tape <= 0.2) {
+      sub = 'wait for the tape, then rewind past the cut';
     }
-    if (world.exitOpen()) {
-      return {
-        x: 3120, y: 300, anchor: 'down',
-        lines: ['SENSOR LOADED — GET TO THE EXIT!'],
-        sub: ''
-      };
-    }
-    return {
-      x: 3120, y: 292, anchor: 'down',
-      lines: ['REWIND THE LOAD ONTO THE SENSOR,', 'THEN CUT THE DRIVE WHEEL'],
-      sub: 'the cut is what freezes it in place'
-    };
+
+    return { x: h.at.x, y: h.at.y, anchor: 'down', lines: h.lines, sub };
   }
   return null;
 }
@@ -709,7 +664,7 @@ function tc(t) {
 function drawHUD(ctx, s) {
   const { world, input, game } = s;
   const blades = world.cutsLeft();
-  const scene = world.progress.scene2 ? '03' : world.progress.scene1 ? '02' : '01';
+  const sceneNo = String((game.levelIndex ?? 0) + 1).padStart(2, '0');
 
   rr(ctx, 48, 40, 356, 104, 16);
   ctx.fillStyle = 'rgba(16,12,26,.85)';
@@ -718,7 +673,7 @@ function drawHUD(ctx, s) {
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  text(ctx, `SCENE ${scene} — TAKE 01`, 74, 70, 15, 'rgba(255,241,222,.62)');
+  text(ctx, `${sceneNo} · ${world.level.label || 'TAKE 01'}`, 74, 70, 15, 'rgba(255,241,222,.62)');
   text(ctx, 'BLADES', 74, 112, 18, P.cream);
 
   for (let i = 0; i < CONFIG.rules.maxCuts; i++) {
@@ -867,7 +822,7 @@ function drawTitle(ctx, game, input, now) {
   const b = CONFIG.ui.title[0];
   drawButton(ctx, b, hovered(CONFIG.ui.title, input.pointer) === b, now);
 
-  text(ctx, 'browser prototype · three scenes · not an Unreal build', 960, 900, 16,
+  text(ctx, `browser prototype · ${game.levelCount || 9} scenes · not an Unreal build`, 960, 900, 16,
     'rgba(255,241,222,.35)', 'center');
 }
 
@@ -883,12 +838,19 @@ function drawPause(ctx, game, input) {
   }
 }
 
-function drawWon(ctx, game, input) {
+function drawWon(ctx, game, input, cleared = false) {
   ctx.fillStyle = 'rgba(9,7,16,0.74)';
   ctx.fillRect(0, 0, 1920, 1080);
 
-  text(ctx, "THAT'S A WRAP", 960, 320, 92, P.cream, 'center');
-  text(ctx, 'the final cut is yours', 960, 400, 24, P.coral, 'center');
+  if (cleared) {
+    const done = (game.levelIndex ?? 0) + 1;
+    const total = game.levelCount ?? 1;
+    text(ctx, 'SCENE CLEARED', 960, 300, 84, P.cream, 'center');
+    text(ctx, `${String(done).padStart(2, '0')} in the can · ${total - done} to go`, 960, 386, 24, P.coral, 'center');
+  } else {
+    text(ctx, "THAT'S A WRAP", 960, 320, 92, P.cream, 'center');
+    text(ctx, 'the final cut is yours', 960, 400, 24, P.coral, 'center');
+  }
 
   const st = game.stats || { time: game.playTime, blades: 0, tape: 0 };
   const mins = Math.floor(st.time / 60);
@@ -906,5 +868,6 @@ function drawWon(ctx, game, input) {
   });
 
   const b = CONFIG.ui.won[0];
-  drawButton(ctx, b, hovered(CONFIG.ui.won, input.pointer) === b, performance.now() / 1000);
+  const shown = cleared ? { ...b, label: 'NEXT SCENE' } : b;
+  drawButton(ctx, shown, hovered(CONFIG.ui.won, input.pointer) === b, performance.now() / 1000);
 }

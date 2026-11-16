@@ -1,6 +1,6 @@
 // Timing only: fixed 120 Hz simulation, one draw per frame.
 
-import { LEVEL } from './level.js';
+import { LEVELS } from './levels.js';
 import { CONFIG } from './config.js';
 import { createGame } from './game.js';
 import { audio } from './audio.js';
@@ -8,7 +8,7 @@ import { audio } from './audio.js';
 const STEP = CONFIG.step;
 
 const canvas = document.getElementById('game');
-const game = createGame(canvas, LEVEL);
+const game = createGame(canvas, LEVELS);
 
 let acc = 0;
 let last = performance.now();

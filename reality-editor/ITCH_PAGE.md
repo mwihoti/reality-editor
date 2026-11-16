@@ -42,7 +42,10 @@ The room is footage. You have a razor blade, a scrub wheel and a timecode. Every
 the set — a wall of crates, a camera dolly, a load hanging from a rail — is recorded
 material, and recorded material can be cut and scrubbed.
 
-Three short scenes, one new idea each.
+Nine short scenes, one new idea each, in nine locations: a studio, a forest clearing, a
+ravine stream, a scaffolding gap, a hook lot, a town crossing, an alley, a tidal flat and a
+last take. Each scene hands you a full tape and four blades — spend them badly and you wait
+for the tape to come back.
 
 **1. The impossible wall**
 
@@ -72,8 +75,9 @@ Click the game once so it has keyboard focus.
 **About**
 
 A browser prototype: Canvas 2D, no engine, no libraries, no image assets — every sound is
-synthesised in code. Built as a design proof for a larger version, so the three scenes are
-short on purpose.
+synthesised in code. Nine scenes over four backdrop sets (studio, forest, city, town,
+beach), about five to fifteen minutes in total. Built as a design proof for a larger
+version, so the scenes are short on purpose.
 ```
 
 ## 3. Video

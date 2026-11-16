@@ -7,16 +7,21 @@
 </style>
 <canvas id="game"></canvas>
 <script type="module">
-import { LEVEL } from '../src/level.js';
+// Deterministic scene set-up for screenshots: ?scene=<name>&level=<index>
+import { LEVELS } from '../src/levels.js';
 import { createGame } from '../src/game.js';
 
-const scene = new URLSearchParams(location.search).get('scene') || 'title';
-const g = createGame(document.getElementById('game'), LEVEL);
+const q = new URLSearchParams(location.search);
+const scene = q.get('scene') || 'title';
+const lv = Number(q.get('level') || 0);
+
+const g = createGame(document.getElementById('game'), LEVELS);
 g.resize();
 
 const W = g.world;
 const wheelRect = { x: 2680, y: 520, w: 170, h: 170 };
 const wallRect = { x: 840, y: 400, w: 340, h: 440 };
+const settle = (n = 6) => { for (let i = 0; i < n; i++) g.step(1 / 120); };
 
 function go() {
   if (scene === 'title') {
@@ -24,7 +29,33 @@ function go() {
     return;
   }
 
-  g.startRun();
+  g.startRun(lv);
+
+  if (scene === 'level') {
+    g.player.place(g.level.spawn.x + 240, 726);
+    settle();
+    g.cam.x = Math.max(0, g.player.x - 760);
+    return;
+  }
+
+  if (scene === 'cleared') {
+    g.game.state = 'cleared';
+    g.game.stats = { time: 47, blades: 3, tape: 21.4 };
+    g.player.place(2100, 726);
+    g.cam.x = 1150;
+    return;
+  }
+
+  if (scene === 'frozen') {
+    W.commitCut(wallRect);
+    W.progress.scene2 = true;
+    W.time = 30;
+    W.commitCut(wheelRect);          // wheel cut while the load is off the sensor
+    g.player.place(2900, 726);
+    g.cam.x = 2060;
+    settle(4);
+    return;
+  }
 
   if (scene === 'wall') {
     g.player.place(700, 726);
@@ -36,9 +67,8 @@ function go() {
     W.progress.scene1 = true;
     W.commitCut(wallRect);
     g.player.place(1560, 726);
-    g.player.vx = 0;
     g.cam.x = 760;
-    W.time = 36;                       // dolly has run to the far end
+    W.time = 36;
     return;
   }
 
@@ -46,14 +76,12 @@ function go() {
     W.progress.scene1 = true;
     W.progress.scene2 = true;
     W.commitCut(wallRect);
-    // park the load on the sensor, then cut the drive wheel
     W.time = 25.38;
     W.commitCut(wheelRect);
     g.game.visual.sensor = 1;
     g.game.visual.shutter = 1;
     g.player.place(3020, 726);
     g.cam.x = 2060;
-
     if (scene === 'won') {
       g.game.state = 'won';
       g.game.stats = { time: 214, blades: 2, tape: 7.4 };
@@ -68,7 +96,7 @@ function go() {
     W.commitCut(wallRect);
     g.player.place(1700, 726);
     W.dollyBoard = W.time;
-    for (let i = 0; i < 12; i++) g.step(1 / 120);
+    settle(12);
     g.cam.x = 1360;
     return;
   }
@@ -84,7 +112,6 @@ function go() {
     g.input.touchMode = true;
     g.player.place(700, 726);
     g.cam.x = 0;
-    return;
   }
 }
 

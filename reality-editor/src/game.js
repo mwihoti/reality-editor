@@ -20,7 +20,9 @@ function hit(buttons, p) {
   return null;
 }
 
-export function createGame(canvas, level) {
+export function createGame(canvas, levelsOrLevel) {
+  const levels = Array.isArray(levelsOrLevel) ? levelsOrLevel : [levelsOrLevel];
+  let level = levels[0];
   const ctx = canvas.getContext('2d');
   const view = { dpr: 1, scale: 1, ox: 0, oy: 0 };
   const cam = { x: 0, zoom: 1 };
@@ -34,12 +36,15 @@ export function createGame(canvas, level) {
   let wasOpen = false;
 
   const game = {
-    state: 'title',              // title | playing | paused | won
+    state: 'title',              // title | playing | paused | cleared | won
     shake: 0,
     playTime: 0,
     checkpoint: { x: level.spawn.x, y: level.spawn.y },
     wallOpened: false,
     visual: { shutter: 0, sensor: 0, spin: 0 },
+    levels,
+    levelIndex: 0,
+    levelCount: levels.length,
     level,
     stats: null
   };
@@ -66,8 +71,12 @@ export function createGame(canvas, level) {
     view.oy = (h - H * view.scale) / 2;
   }
 
-  function startRun() {
-    world.reset();
+  function startRun(index = game.levelIndex) {
+    game.levelIndex = Math.max(0, Math.min(levels.length - 1, index));
+    level = levels[game.levelIndex];
+    game.level = level;
+    if (world.level !== level) world.setLevel(level);
+    else world.reset();
     player.place(level.spawn.x, level.spawn.y);
     cam.x = 0;
     cam.zoom = 1;
@@ -88,6 +97,10 @@ export function createGame(canvas, level) {
   function togglePause() {
     if (game.state === 'playing') game.state = 'paused';
     else if (game.state === 'paused') game.state = 'playing';
+  }
+
+  function nextLevel() {
+    if (game.levelIndex + 1 < levels.length) startRun(game.levelIndex + 1);
   }
 
   function step(dt) {
@@ -117,8 +130,16 @@ export function createGame(canvas, level) {
       return;
     }
 
+    if (game.state === 'cleared') {
+      if (jumpPressed || hit(CONFIG.ui.won, click)) {
+        audio.click();
+        nextLevel();
+      }
+      return;
+    }
+
     if (game.state === 'won') {
-      if (jumpPressed || hit(CONFIG.ui.won, click)) startRun();
+      if (jumpPressed || hit(CONFIG.ui.won, click)) startRun(0);
       return;
     }
 
@@ -235,8 +256,13 @@ export function createGame(canvas, level) {
           blades: world.cutsLeft(),
           tape: world.tape
         };
-        audio.win();
-        game.state = 'won';
+        if (game.levelIndex + 1 < levels.length) {
+          audio.chime();
+          game.state = 'cleared';
+        } else {
+          audio.win();
+          game.state = 'won';
+        }
       }
     }
 
@@ -272,7 +298,8 @@ export function createGame(canvas, level) {
   return {
     view, cam, world, player, input, game,
     resize, step, draw,
-    startRun, togglePause,
+    startRun, togglePause, nextLevel,
+    get level() { return level; },
     get state() { return game.state; }
   };
 }

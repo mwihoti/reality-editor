@@ -167,18 +167,20 @@ press('KeyR'); steps(60); release('KeyR');
 ok('tape never goes negative', g.world.tape >= 0);
 ok('rewind stops when the tape is spent', !g.world.rewinding || g.world.tape === 0);
 
-// tape recovers while the take plays, so a spent tape is never a dead end
+// tape is a hard budget until it is spent; only then does it come back
 release('KeyR');
 steps(2);
-g.world.tape = 2.0;
-const rec0 = g.world.tape;
+g.world.tape = 12.0;
+g.world.rescue = false;          // mid-run state: nothing spent, no rescue armed
 steps(240);
-ok('the tape refills while the take runs', g.world.tape > rec0 + 0.3,
+ok('the tape budget holds while any remains', Math.abs(g.world.tape - 12) < 0.05,
   `tape=${g.world.tape.toFixed(2)}`);
-g.world.tape = CONFIG.rules.maxTape - 0.05;
-steps(120);
-ok('the tape never refills past its cap',
-  g.world.tape <= CONFIG.rules.maxTape + 1e-9, `tape=${g.world.tape.toFixed(2)}`);
+g.world.tape = 0;
+steps(240);
+ok('a fully spent tape refills', g.world.tape > 0.3, `tape=${g.world.tape.toFixed(2)}`);
+steps(3000);
+ok('recovery stops at the cap', g.world.tape <= CONFIG.rules.maxTape + 1e-9,
+  `tape=${g.world.tape.toFixed(2)}`);
 
 // ---- D. puzzle 1: the impossible wall ------------------------------------
 g.startRun();
@@ -342,6 +344,80 @@ steps(60);
 ok('falling respawns at the last checkpoint',
   Math.abs(g.player.x - 1560) < 4 && Math.abs(g.player.y - 726) < 3,
   `x=${g.player.x.toFixed(0)} y=${g.player.y.toFixed(0)}`);
+
+// ---- L. the shoot list: nine scenes ----------------------------------------
+const { LEVELS } = await import('../src/levels.js');
+const cv2 = document.createElement('canvas');
+cv2.width = 1920;
+cv2.height = 1080;
+cv2.style.display = 'none';
+document.body.appendChild(cv2);
+const g2 = createGame(cv2, LEVELS);
+const st2 = (n) => { for (let i = 0; i < n; i++) g2.step(STEP); };
+const floorsOf = (L) => L.props.filter(p => p.kind === 'slab');
+const doorOf = (L) => L.props.find(p => p.kind === 'shutter');
+
+ok('there are nine scenes', LEVELS.length === 9, `${LEVELS.length}`);
+ok('every scene has its own backdrop', LEVELS.every(L => !!L.theme),
+  LEVELS.map(L => L.theme).join(','));
+ok('every scene stands on a real floor', LEVELS.every(L =>
+  floorsOf(L).some(f => L.spawn.x >= f.x && L.spawn.x <= f.x + f.w)));
+ok('every scene has a door standing on the floor', LEVELS.every(L => {
+  const d = doorOf(L);
+  return d && floorsOf(L).some(f => d.x >= f.x && d.x + d.w <= f.x + f.w);
+}));
+
+ok('every dolly bridges a gap too wide to jump', LEVELS.filter(L => L.props.some(p => p.id === 'dolly')).every(L => {
+  const d = L.props.find(p => p.id === 'dolly');
+  const under = floorsOf(L).filter(f => f.x <= d.x).pop();
+  const gapStart = under.x + under.w;
+  const next = floorsOf(L).filter(f => f.x > gapStart).sort((a, b) => a.x - b.x)[0];
+  return !!next && next.x - gapStart >= 300 && d.motion.to + d.w >= next.x - 1;
+}), 'a dolly that cannot reach the far side would be a dead end');
+
+ok('every load line can be parked on its sensor', LEVELS.filter(L => L.load).every(L => {
+  const t = CONFIG.rules.startTime - (L.load.anchorCX - L.sensorCX) / L.load.speed;
+  return t > 0 && t < CONFIG.rules.startTime;
+}));
+
+// progression: finish the second scene, then the next one loads
+ok('the first scene is the studio', g2.world.level.label === 'THE STUDIO', g2.world.level.label);
+g2.startRun(1);
+ok('the second scene loads', g2.world.level.label === 'THE CLEARING' && g2.state === 'playing',
+  `${g2.world.level.label} ${g2.state}`);
+
+g2.input.keys.add('KeyD');
+st2(600);
+g2.input.keys.delete('KeyD');
+ok('the wall stops you in the new scene too', g2.player.x < 880, `x=${g2.player.x.toFixed(0)}`);
+
+g2.world.commitCut({ x: 860, y: 400, w: 380, h: 440 });
+ok('the wall can be cut there', g2.world.cutsLeft() === CONFIG.rules.maxCuts - 1,
+  `blades=${g2.world.cutsLeft()}`);
+
+g2.input.keys.add('KeyD');
+st2(900);
+g2.input.keys.delete('KeyD');
+ok('the second scene can be finished', g2.state === 'cleared', `${g2.state} x=${g2.player.x.toFixed(0)}`);
+
+g2.nextLevel();
+ok('clearing a scene loads the next one',
+  g2.world.level.label === 'THE STREAM' && g2.state === 'playing',
+  `${g2.world.level.label} ${g2.state}`);
+ok('a new scene starts with full tape and blades',
+  Math.abs(g2.world.tape - CONFIG.rules.maxTape) < 1e-9 && g2.world.cutsLeft() === CONFIG.rules.maxCuts);
+
+// the last scene ends the run instead of offering another
+g2.startRun(LEVELS.length - 1);
+// park the load on its sensor so the door is open, then walk through it
+g2.world.time = CONFIG.rules.startTime -
+  (g2.level.load.anchorCX - g2.level.sensorCX) / g2.level.load.speed;
+ok('the finale door opens when the load is parked', g2.world.exitOpen(),
+  `load=${g2.world.loadCX().toFixed(0)} sensor=${g2.level.sensorCX}`);
+g2.player.place(g2.level.exit.x + 40, 726);
+st2(6);
+ok('finishing the last scene ends the run', g2.state === 'won',
+  `${g2.world.level.label} ${g2.state}`);
 
 document.getElementById('out').textContent = out.join('\n');
 document.title = fail === 0 ? `TESTS PASS ${pass}/${pass}` : `TESTS FAIL ${fail}`;

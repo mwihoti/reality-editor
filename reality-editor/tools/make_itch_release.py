@@ -23,7 +23,8 @@ ZIP = DIST / "RealityEditor_web.zip"
 
 RUNTIME = ["index.html"]
 SRC = sorted((ROOT / "src").glob("*.js"))
-SHOTS = ["shot-wall.png", "shot-gap.png", "shot-final.png", "shot-won.png", "shot-title.png"]
+SHOTS = ["shot-wall.png", "shot-gap.png", "shot-final.png", "shot-won.png", "shot-title.png",
+         "shot-level-forest.png", "shot-level-urban.png", "shot-level-town.png", "shot-level-beach.png"]
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/TTF/JetBrainsMonoNerdFontMono-Bold.ttf",
@@ -73,8 +74,9 @@ def make_cover():
 
     draw.text((630 // 2, 414), "CUT  \u00b7  REWIND  \u00b7  MAKE THE EXIT",
               font=font(19), fill=(255, 107, 129), anchor="mm")
-    draw.text((630 // 2, 452), "A THREE-SCENE PUZZLE PLATFORMER IN THE BROWSER",
+    draw.text((630 // 2, 452), "A NINE-SCENE PUZZLE PLATFORMER IN THE BROWSER",
               font=font(11), fill=(196, 186, 168), anchor="mm")
+
 
     out = MEDIA / "cover.png"
     cover.save(out, optimize=True)
