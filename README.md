@@ -54,15 +54,18 @@ you a wait rather than the run.
 
 | # | Scene | Location | The idea |
 |---|---|---|---|
-| 1 | THE STUDIO | studio | three beats in one room: cut the wall, rewind the dolly, park the load |
-| 2 | THE CLEARING | forest | four crates tall, unjumpable — cut them out of the frame |
-| 3 | THE STREAM | forest | the dolly has already rolled across the water; rewind it back and ride it |
-| 4 | SCAFFOLD | city | a wall to cut and a dolly to rewind, in the same gap |
-| 5 | THE HOIST | city | rewind the load onto the sensor, then cut the wheel to freeze it |
-| 6 | CROSSING | town | wall, dolly and hoist in one street |
-| 7 | THE ALLEY | town | cut the wall below, freeze the line above |
-| 8 | THE TIDE | beach | the widest gap in the game |
-| 9 | LAST TAKE | beach | everything at once, then the door |
+| 1 | THE STUDIO | studio | three beats: cut the crate wall, ride the dolly across, park the load and cut the wheel |
+| 2 | THE CLEARING | forest | **the gate** — a bar drops across the walk; rewind until it lifts |
+| 3 | THE STREAM | forest | **the lift** — it hangs in a hole in the floor; drop it, ride it up to a high door |
+| 4 | SCAFFOLD | city | **the pressure plate** — a door held open only by weight: put the dolly back on the pad |
+| 5 | THE HOIST | city | **the load line** — parked on the sensor is not enough, the wheel has to be cut too |
+| 6 | CROSSING | town | gate, then lift |
+| 7 | THE ALLEY | town | pad, then gate |
+| 8 | THE TIDE | beach | lift up to the hoist deck |
+| 9 | LAST TAKE | beach | pad, gate, lift |
+
+Only the studio uses crate cuts, and only the studio and the dolly scenes use the dolly as a vehicle:
+the eight new scenes each introduce their own contraption rather than restaging the studio's.
 
 Clearing a scene shows what's in the can and loads the next; the ninth ends on the wrap
 screen. The backdrops are painted in `src/themes.js` — one per location, no image assets.
@@ -74,7 +77,7 @@ cd reality-editor
 ./tests/run-tests.sh
 ```
 
-110 assertions over the mechanics, all nine scenes, the progression between them, the title
+118 assertions over the mechanics, all nine scenes, the progression between them, the title
 buttons and the save file; a check that runs the real `requestAnimationFrame` loop in headless
 Chromium with real input; and a play bot (`tests/bot.html`) that drives every one of the nine
 scenes to its exit through the real input path — keys for walking and rewinding, a real

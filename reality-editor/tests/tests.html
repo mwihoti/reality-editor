@@ -279,8 +279,9 @@ guard = 0;
 while (Math.abs(w.loadCX() - LEVEL.sensorCX) > 15 && guard++ < 4000) g.step(STEP);
 release('KeyR'); steps(2);
 ok('rewinding walks the load onto the sensor', w.sensorLoaded(), `load=${w.loadCX().toFixed(0)}`);
-ok('the sensor opens the exit', w.exitOpen());
-ok('the open shutter stops blocking', !w.solids().some(s => s.id === 'shutter'));
+// the strict rule: parked alone is not an edit
+ok('parked alone does not open the exit', !w.exitOpen());
+ok('the uncut door still blocks', w.solids().some(s => s.id === 'shutter'));
 
 steps(360);   // let time run forward
 ok('the load drifts off the sensor again', !w.sensorLoaded());
@@ -293,6 +294,7 @@ release('KeyR'); steps(2);
 ok('the load is on the sensor a second time', w.sensorLoaded(), `load=${w.loadCX().toFixed(0)}`);
 w.commitCut(wheelRect);
 ok('cutting the wheel on the sensor freezes the line', !w.driveRunning());
+ok('now the shutter stops blocking', !w.solids().some(s => s.id === 'shutter'));
 steps(600);
 ok('the frozen load holds the sensor', w.sensorLoaded());
 ok('the exit stays open', w.exitOpen());
@@ -367,13 +369,29 @@ ok('every scene has a door standing on the floor', LEVELS.every(L => {
   return d && floorsOf(L).some(f => d.x >= f.x && d.x + d.w <= f.x + f.w);
 }));
 
-ok('every dolly bridges a gap too wide to jump', LEVELS.filter(L => L.props.some(p => p.id === 'dolly')).every(L => {
-  const d = L.props.find(p => p.id === 'dolly');
-  const under = floorsOf(L).filter(f => f.x <= d.x).pop();
-  const gapStart = under.x + under.w;
-  const next = floorsOf(L).filter(f => f.x > gapStart).sort((a, b) => a.x - b.x)[0];
-  return !!next && next.x - gapStart >= 300 && d.motion.to + d.w >= next.x - 1;
-}), 'a dolly that cannot reach the far side would be a dead end');
+// every scene after the studio must bring its own object and its own verb
+const objectsOf = (L) => {
+  const out = new Set();
+  for (const p of L.props) {
+    if (p.kind === 'gate' || p.kind === 'lift' || p.kind === 'plate' || p.kind === 'relay') out.add(p.kind);
+    if (p.id === 'wheel') out.add('hoist');
+    if (p.id === 'dolly') out.add('dolly');
+  }
+  return [...out].sort().join('+');
+};
+const newScenes = LEVELS.slice(1);
+ok('every new scene has its own object set',
+  new Set(newScenes.map(objectsOf)).size === newScenes.length,
+  newScenes.map(objectsOf).join(' | '));
+ok('no new scene repeats the studio crate wall',
+  newScenes.every(L => !L.props.some(p => p.id.indexOf('wall-') === 0)));
+ok('every gate holds itself clear for part of its cycle',
+  LEVELS.every(L => L.props.filter(p => p.kind === 'gate').every(p => p.motion && p.motion.hold > 0.25)));
+ok('every lift is boardable from the floor',
+  LEVELS.filter(L => L.props.some(p => p.kind === 'lift')).every(L => {
+    const l = L.props.find(p => p.kind === 'lift');
+    return l.motion && l.motion.from === 820 && l.motion.to < 820 && l.motion.hold > 0.25;
+  }));
 
 ok('every load line can be parked on its sensor', LEVELS.filter(L => L.load).every(L => {
   const t = CONFIG.rules.startTime - (L.load.anchorCX - L.sensorCX) / L.load.speed;
@@ -386,18 +404,18 @@ g2.startRun(1);
 ok('the second scene loads', g2.world.level.label === 'THE CLEARING' && g2.state === 'playing',
   `${g2.world.level.label} ${g2.state}`);
 
+// the gate is a real obstacle: low bar across the walk
+const gate = g2.world.level.props.find(p => p.kind === 'gate');
+ok('the new scene has a gate', !!gate && gate.kind === 'gate');
+g2.world.time = 0;                    // bottom of the cycle: the bar is down
+g2.player.place(1050, 726);
 g2.input.keys.add('KeyD');
-st2(600);
+st2(240);
 g2.input.keys.delete('KeyD');
-ok('the wall stops you in the new scene too', g2.player.x < 880, `x=${g2.player.x.toFixed(0)}`);
+ok('a dropped gate stops the walk', g2.player.x < 1140, `x=${g2.player.x.toFixed(0)}`);
 
-g2.world.commitCut({ x: 860, y: 400, w: 380, h: 440 });
-ok('the wall can be cut there', g2.world.cutsLeft() === CONFIG.rules.maxCuts - 1,
-  `blades=${g2.world.cutsLeft()}`);
-
-g2.input.keys.add('KeyD');
-st2(900);
-g2.input.keys.delete('KeyD');
+g2.player.place(g2.level.exit.x + 120, 726);
+st2(6);
 ok('the second scene can be finished', g2.state === 'cleared', `${g2.state} x=${g2.player.x.toFixed(0)}`);
 
 g2.nextLevel();
@@ -407,14 +425,25 @@ ok('clearing a scene loads the next one',
 ok('a new scene starts with full tape and blades',
   Math.abs(g2.world.tape - CONFIG.rules.maxTape) < 1e-9 && g2.world.cutsLeft() === CONFIG.rules.maxCuts);
 
+// the hoist demands the whole edit: parked alone is not enough
+const hoistIndex = LEVELS.findIndex(L => L.level === undefined && L.load);
+g2.startRun(hoistIndex);
+const HW = g2.world;
+HW.time = CONFIG.rules.startTime - (HW.level.load.anchorCX - HW.level.sensorCX) / HW.level.load.speed;
+ok('the load can be parked on the sensor', HW.sensorLoaded(), `load=${HW.loadCX().toFixed(0)}`);
+ok('parked alone does NOT open the door', !HW.exitOpen(), `door=${HW.exitOpen()}`);
+HW.commitCut({ x: HW.byId('wheel').x - 20, y: HW.byId('wheel').y - 20, w: 170, h: 170 });
+ok('parked and cut opens the door', HW.exitOpen() && !HW.driveRunning(),
+  `door=${HW.exitOpen()} driving=${HW.driveRunning()}`);
+
 // the last scene ends the run instead of offering another
 g2.startRun(LEVELS.length - 1);
-// park the load on its sensor so the door is open, then walk through it
-g2.world.time = CONFIG.rules.startTime -
-  (g2.level.load.anchorCX - g2.level.sensorCX) / g2.level.load.speed;
-ok('the finale door opens when the load is parked', g2.world.exitOpen(),
-  `load=${g2.world.loadCX().toFixed(0)} sensor=${g2.level.sensorCX}`);
-g2.player.place(g2.level.exit.x + 40, 726);
+ok('the finale is a gate + pad + lift scene',
+  !!g2.world.level.props.find(p => p.kind === 'gate')
+  && !!g2.world.byId('plate') && !!g2.world.byId('lift'),
+  g2.world.level.label);
+ok('the finale has no load line to open', g2.world.exitOpen() && !g2.world.hasMechanism());
+g2.player.place(g2.level.exit.x + 120, (g2.level.exit.doorY ?? 820) - 94);
 st2(6);
 ok('finishing the last scene ends the run', g2.state === 'won',
   `${g2.world.level.label} ${g2.state}`);

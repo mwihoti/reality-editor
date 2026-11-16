@@ -109,6 +109,39 @@ scene index), `cleared`, `best` (fastest full run) and `finished`. The title scr
 - Every save read is validated and stored in a try/catch, so private mode, a strict itch
 iframe, corrupt JSON or a hand-edited entry all degrade to a blank save instead of a crash.
 
+## The eight new contraptions (redesign)
+
+Scenes 2–8 originally restaged the studio: a crate wall, a dolly ride, a hoist. They are now
+distinct objects with distinct verbs, and nothing after scene 1 repeats a studio beat.
+
+- **The hoist demands the edit.** `exitOpen()` is now `sensorLoaded() && !driveRunning()`:
+parking the load on the sensor is not enough, the wheel has to be cut to freeze it. Tests
+assert both halves (parked alone → shut; parked + cut → open).
+- **Gate** (`kind: 'gate'`, scene 2/6/7/9): a bar hanging in a doorway. New `cycle` motion
+type — parked for `hold` of each period, then one smooth trip and back. A plain sine only
+touches its extreme for a frame, which made the pass impossible to time; the dwell is what
+makes it walkable.
+- **Lift** (`kind: 'lift'`, scene 3/6/8/9): a platform on a vertical `cycle`. It has to hang
+over a *hole in the floor*, otherwise the player just walks past it and never rides. Its top
+sits 6px above the ledge — level with it, the rider's feet catch the ledge's side and the
+ride never lands.
+- **Pressure plate + relay door** (`kind: 'plate'` / `'relay'`, scene 4/7/9): `plateHeld()` is
+true only while the dolly overlaps the pad, and the relay shutter is solid until then. The
+dolly crossed the pad before the take starts, so the player rewinds it back on and dashes
+through the door while it holds.
+- The dolly now appears only as dead weight on a plate (aside from the studio's ride), and
+crates only in the studio.
+
+Bot results after the redesign (all through the real input path):
+
+```
+01 THE STUDIO   18.3s   02 THE CLEARING 26.7s   03 THE STREAM  17.9s
+04 SCAFFOLD     10.7s   05 THE HOIST    11.2s   06 CROSSING    17.9s
+07 THE ALLEY    13.7s   08 THE TIDE     32.2s   09 LAST TAKE   88.8s (won)
+```
+
+118 assertions plus the bot, all passing.
+
 ## The crash that stopped cuts working, and the bot that now guards it
 
 - `game.js` read `level.drive.id` on every successful cut. Only the studio and the hoist

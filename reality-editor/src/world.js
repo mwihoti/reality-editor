@@ -73,9 +73,20 @@ export class World {
     const m = p.motion;
     if (!m) return out;
 
+    const vertical = m.axis === 'y';
     if (m.type === 'sine') {
       const u = 0.5 - 0.5 * Math.cos(Math.PI * 2 * (t / m.period + (m.phase || 0)));
-      out.x = m.from + (m.to - m.from) * u;
+      const v = m.from + (m.to - m.from) * u;
+      if (vertical) out.y = v; else out.x = v;
+    } else if (m.type === 'cycle') {
+      // Parked at `from` for the first `hold` of every period, then one smooth
+      // trip to `to` and back. The dwell is what makes a lift boardable: a
+      // plain sine only touches the floor for a single frame.
+      const u = ((t / m.period + (m.phase || 0)) % 1 + 1) % 1;
+      const hold = m.hold ?? 0.45;
+      const k = u < hold ? 0 : Math.sin(Math.PI * (u - hold) / (1 - hold));
+      const v = m.from + (m.to - m.from) * k;
+      if (vertical) out.y = v; else out.x = v;
     } else if (m.type === 'linear') {
       const lo = Math.min(m.from, m.to);
       const hi = Math.max(m.from, m.to);
@@ -83,7 +94,8 @@ export class World {
       // If the player boards it there, the take resumes from that moment, so
       // stepping on always starts the ride instead of waiting for the clock.
       const base = (p.id === 'dolly' && this.dollyBoard !== null) ? this.dollyBoard : m.startTime;
-      out.x = clamp(m.from + m.speed * (t - base), lo, hi);
+      const v = clamp(m.from + m.speed * (t - base), lo, hi);
+      if (vertical) out.y = v; else out.x = v;
     }
     return out;
   }
@@ -126,7 +138,32 @@ export class World {
     return Math.abs(this.loadCX() - this.level.sensorCX) <= CONFIG.mechanism.sensorHalfWindow;
   }
 
-  exitOpen() { return this.sensorLoaded(); }
+  // A hoist scene demands the whole edit: the load parked on the sensor AND
+  // the drive wheel cut to freeze it there. Parked alone is not enough — the
+  // load drifts off the sensor the moment the clock runs on.
+  exitOpen() {
+    if (!this.hasMechanism()) return true;
+    return this.sensorLoaded() && !this.driveRunning();
+  }
+
+  // A pressure plate is held by weight: only the dolly is heavy enough.
+  plateHeld() {
+    const pad = this.byId('plate');
+    if (!pad) return false;
+    const p = this.stateAt(pad, this.time);
+    for (const pr of this.level.props) {
+      if (pr.kind !== 'dolly' || !this.alive(pr)) continue;
+      const s = this.stateAt(pr, this.time);
+      if (s.x + s.w > p.x && s.x < p.x + p.w) return true;
+    }
+    return false;
+  }
+
+  shutterOpen(p) {
+    if (!p) return true;
+    if (p.kind === 'relay') return this.plateHeld();
+    return this.exitOpen();
+  }
 
   // ---- cutting ------------------------------------------------------------
   cutsUsed() {
@@ -167,7 +204,7 @@ export class World {
     const list = [];
     for (const p of this.level.props) {
       if (!p.solid || !this.alive(p)) continue;
-      if (p.kind === 'shutter' && this.exitOpen()) continue;
+      if ((p.kind === 'shutter' || p.kind === 'relay') && this.shutterOpen(p)) continue;
       // during rewind the footage is a ghost: it cannot drag or crush you —
       // except the thing you are standing on, which must not vanish underfoot
       if (p.motion && this.rewinding && p.id !== groundedOn) continue;

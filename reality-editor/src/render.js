@@ -131,6 +131,78 @@ function drawBackdrop(ctx, cam, now, theme) {
   ctx.fillRect(0, 986, 1920, 94);
 }
 
+// ---- the new set dressing ---------------------------------------------------
+function drawGate(ctx, s) {
+  const cx = s.x + s.w / 2;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,241,222,.26)';
+  ctx.lineWidth = 5;
+  line(ctx, cx - 16, 0, cx - 16, s.y + 18);
+  line(ctx, cx + 16, 0, cx + 16, s.y + 18);
+
+  rr(ctx, s.x, s.y, s.w, s.h, 12);
+  ctx.fillStyle = '#2b2440';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,241,222,.22)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.save();
+  rr(ctx, s.x, s.y, s.w, s.h, 12);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(255,111,125,.45)';
+  for (let y = s.y + 26; y < s.y + s.h - 24; y += 58) {
+    ctx.fillRect(s.x, y, s.w, 12);
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawLift(ctx, s) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,241,222,.14)';
+  ctx.lineWidth = 6;
+  line(ctx, s.x + 12, s.y, s.x + 12, 828);
+  line(ctx, s.x + s.w - 12, s.y, s.x + s.w - 12, 828);
+
+  rr(ctx, s.x, s.y, s.w, s.h, 8);
+  ctx.fillStyle = '#3a3156';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,241,222,.34)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(242,193,78,.8)';
+  ctx.fillRect(s.x + 18, s.y + s.h - 6, s.w - 36, 4);
+  ctx.restore();
+}
+
+function drawPlate(ctx, s, world) {
+  const held = world.plateHeld();
+  ctx.save();
+  rr(ctx, s.x, s.y, s.w, s.h + 8, 6);
+  ctx.fillStyle = held ? 'rgba(242,193,78,.85)' : 'rgba(255,241,222,.16)';
+  ctx.fill();
+  ctx.strokeStyle = held ? 'rgba(255,241,222,.55)' : 'rgba(255,241,222,.22)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRelay(ctx, s, world) {
+  const open = world.shutterOpen({ kind: 'relay' });
+  ctx.save();
+  if (open) ctx.globalAlpha = 0.25;
+  rr(ctx, s.x, s.y, s.w, s.h, 8);
+  ctx.fillStyle = '#2b2440';
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,241,222,.22)';
+  for (let y = s.y + 14; y < s.y + s.h - 8; y += 26) {
+    ctx.fillRect(s.x + 6, y, s.w - 12, 8);
+  }
+  ctx.restore();
+}
+
 function drawProps(ctx, world, game, now) {
   for (const p of world.level.props) {
     if (!world.alive(p)) continue;
@@ -149,6 +221,10 @@ function drawProps(ctx, world, game, now) {
       case 'wheel': drawWheel(ctx, st, game); break;
       case 'frame': drawFrame(ctx, st, game); break;
       case 'shutter': drawShutter(ctx, st, game); break;
+      case 'gate': drawGate(ctx, st); break;
+      case 'lift': drawLift(ctx, st); break;
+      case 'plate': drawPlate(ctx, st, world); break;
+      case 'relay': drawRelay(ctx, st, world); break;
       default: break;
     }
 
@@ -554,7 +630,12 @@ function hintFor(world, player) {
     if (h.need === 'dollyAway' && !(dollyX !== null && dollyX > dolly.motion.from + 40)) continue;
     if (h.need === 'craneFrozen' && (world.driveRunning() || world.exitOpen())) continue;
     if (h.need === 'craneLoaded' && !world.exitOpen()) continue;
-    if (h.need === 'crane' && (world.exitOpen() || !world.driveRunning())) continue;
+    if (h.need === 'crane' && world.exitOpen()) continue;
+    if (h.need === 'lift') {
+      const l = world.byId('lift');
+      if (!l || world.stateAt(l, world.time).y > 780) continue;   // already down
+    }
+    if (h.need === 'plate' && world.plateHeld()) continue;        // already held
 
     let sub = h.sub;
     if (h.need === 'craneFrozen' && world.tape <= 0.2) {

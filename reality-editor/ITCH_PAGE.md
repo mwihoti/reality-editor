@@ -61,6 +61,13 @@ back to you. You stay put — you're outside the tape.
 A load hangs from a rail driven by a drive wheel. Rewind it onto the sensor, then cut the
 wheel to freeze it there. That's the only way the exit opens.
 
+**Then eight more, each with its own contraption**
+
+A gate that has to be raised, a lift that only moves on the clock, a pressure plate that
+only weight can hold, and a load line where parked is not enough — the wheel has to be cut
+too. After that come combinations: gate and lift, pad and gate, lift and hoist. No object
+is restaged from the opening set.
+
 **Controls**
 
 - Move: A / D or arrow keys

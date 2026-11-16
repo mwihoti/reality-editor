@@ -10,10 +10,13 @@
 // the scene only counts as passed when the game itself reports cleared/won.
 //
 // Policy, evaluated every frame:
-//   on the dolly      -> stand until it reaches the far side, then step off
-//   crates ahead      -> drag a cut over them
-//   no floor ahead    -> hold R until the dolly rolls back to the ledge
-//   stuck, load line  -> rewind the load onto the sensor, then cut the wheel
+//   riding the lift   -> stand until it tops out, then step off
+//   crates ahead      -> drag a cut over them (studio only)
+//   gate in the way   -> rewind until it swings clear
+//   relay door ahead  -> rewind until the plate is held, then run through it
+//   blocked, high door-> rewind the lift down
+//   no floor ahead    -> hold R for the dolly
+//   blocked, hoist    -> park the load, then cut the wheel
 //   otherwise         -> walk right
 import { LEVELS } from '../src/levels.js';
 import { createGame } from '../src/game.js';
@@ -51,15 +54,22 @@ function solve(index) {
   const P = g.player;
   const keys = g.input.keys;
 
+  const lift = W.byId('lift');
+  const gate = W.level.props.find(p => p.kind === 'gate');
+  const relay = W.level.props.find(p => p.kind === 'relay');
+  const highExit = (W.level.exit.doorY ?? 820) < 700;
+
   let frames = 0;
   let lastX = P.x;
   let still = 0;
   let cuts = 0;
   let cutCool = 0;
   let jumpCool = 0;
-  let fell = false;
+  let pullExtra = 0;
+  let felled = false;
   let dollyX = null;
-  let pulling = false;   // one continuous rewind, not a twitch every frame
+  let liftY = null;
+  let sawLowLift = false;
   const trace = [];
   const note = (what) => { if (trace.length < 10) trace.push(`${what}@${P.x.toFixed(0)}`); };
   const maxFrames = Math.round(MAX_SECONDS / DT);
@@ -70,18 +80,22 @@ function solve(index) {
     const dolly = W.byId('dolly');
     const dollyS = dolly ? W.stateAt(dolly, W.time) : null;
     dollyX = dollyS ? dollyS.x : null;
+    const liftS = lift ? W.stateAt(lift, W.time) : null;
+    liftY = liftS ? liftS.y : null;
+    const gateS = gate ? W.stateAt(gate, W.time) : null;
+    const onLift = P.groundId === 'lift';
     const onDolly = P.groundId === 'dolly';
+
     const solids = W.solids(P.groundId);
     const probeY = P.y + P.h + 12;
     const over = (s, x) => x >= s.x && x <= s.x + s.w && probeY >= s.y - 6 && probeY <= s.y + s.h;
-    // A dolly can be a ghost (mid-rewind) and can park a few pixels off the
-    // ledge, so probe a short span ahead and include the dolly's real bounds.
+    // moving props are collision ghosts while rewinding, so probe them directly
     const floorAhead = [8, 20, 32].some(dx => {
       const x = P.x + P.w + dx;
-      return solids.some(s => over(s, x)) || (dollyS ? over(dollyS, x) : false);
+      return solids.some(s => over(s, x))
+        || (dollyS ? over(dollyS, x) : false)
+        || (liftS ? over(liftS, x) : false);
     });
-    const dollyGap = dollyS ? dollyS.x - (P.x + P.w) : Infinity;
-    if (floorAhead) pulling = false;
 
     const crates = W.cuttableProps().filter(p =>
       p.kind === 'crate'
@@ -90,39 +104,58 @@ function solve(index) {
       && p.y + p.h > P.y - 30
       && p.y < P.y + P.h + 30);
 
+    // the bar blocks only while it is low and close enough to walk into
+    const gateBlocks = !!gateS
+      && gateS.y + gateS.h > P.y + 8
+      && gateS.y < P.y + P.h
+      && gateS.x + gateS.w > P.x + P.w - 12
+      && gateS.x < P.x + P.w + 90;
+
+    const relayAhead = !!relay && relay.x > P.x && relay.x - P.x < 480;
+    const liftUp = !!liftS && liftS.y < lift.motion.to + 40;
+    const nearLift = !!lift && Math.abs((lift.x + lift.w / 2) - (P.x + P.w / 2)) < 560;
+    const dollyGap = dollyS ? dollyS.x - (P.x + P.w) : Infinity;
+
     let cut = null;
 
-    if (onDolly) {
+    if (onLift) {
+      if (liftS.y > lift.motion.to + 6) { /* wait for the ride */ }
+      else keys.add('KeyD');
+    } else if (onDolly) {
+      // stand still and let it carry you, then step off at the far end
       if (dolly.motion && dollyS.x >= dolly.motion.to - 26) keys.add('KeyD');
     } else if (still > 0.2 && crates.length && W.cutsLeft() > 0 && cutCool <= 0) {
       cut = union(crates.map(p => W.stateAt(p, W.time)));
       cutCool = 0.5;
-    } else if (!floorAhead && dolly && dollyGap > 4 && dollyGap <= 170 && still > 0.15) {
-      // parked just out of walking reach: a short hop lands on it (the jump
-      // covers ~230px, so never hop at a dolly parked across the whole gap)
-      keys.add('KeyD');
-      if (P.onGround && jumpCool <= 0) {
-        keys.add('Space');
-        jumpCool = 0.5;
+    } else if (gateBlocks) {
+      // the gate holds itself up for part of every cycle, so scrub for it only
+      // while the tape is plentiful; otherwise just stand and let it lift
+      if (W.tape > 22 && W.time > 2) keys.add('KeyR');
+    } else if (relayAhead) {
+      if (!W.plateHeld()) {
+        pullExtra = 0;
+        if (W.tape > 0.02) keys.add('KeyR');
+      } else if (pullExtra < 2.0) {
+        // the pad only holds for a while: pull deep inside the window first
+        pullExtra += DT;
+        if (W.tape > 0.02) keys.add('KeyR');
+      } else {
+        keys.add('KeyD');
       }
     } else if (!floorAhead) {
-      // only the dolly decides when you can cross; pull it in one go, and if
-      // the tape ran out mid-pull, wait for the rescue refill instead of
-      // twitching R against an empty gauge forever
-      if (dolly) {
-        if (pulling && W.tape <= 0.02) pulling = false;
-        if (!pulling && W.tape > 14) pulling = true;
-        if (pulling) keys.add('KeyR');
+      const parked = dollyS && dollyS.x <= dolly.motion.from + 2;
+      if (dolly && parked && dollyGap > 4 && dollyGap <= 200 && still > 0.15) {
+        keys.add('KeyD');
+        if (P.onGround && jumpCool <= 0) { keys.add('Space'); jumpCool = 0.5; }
+      } else if (dolly && W.tape > 0.02) {
+        keys.add('KeyR');                     // pull the dolly back to the ledge
       }
-    } else if (still > 0.35 && W.hasMechanism() && W.driveRunning()) {
-      // park the load well inside the window, then cut: a cut on the very edge
-      // leaves the shutter shut again the moment the clock moves on
+      // a lift: just stand still, its next dwell is only seconds away
+    } else if (still > 0.35 && W.hasMechanism() && !W.exitOpen()) {
       const pad = Math.abs(W.loadCX() - W.level.sensorCX);
-      if (pad < 30) {
-        cut = union([W.stateAt(W.byId('wheel'), W.time)]);
-      } else if (W.tape > 0.02) {
-        keys.add('KeyR');
-      }
+      if (!W.driveRunning()) keys.add('KeyR');            // frozen off the pad: undo it
+      else if (pad < 30) cut = union([W.stateAt(W.byId('wheel'), W.time)]);
+      else if (W.tape > 0.02) keys.add('KeyR');
     } else {
       keys.add('KeyD');
     }
@@ -139,10 +172,11 @@ function solve(index) {
 
     if (Math.abs(P.x - lastX) < 0.4) still += DT;
     else still = 0;
+    if (P.groundId === 'lift') note('ride');
+    if (liftY !== null && liftY > 812) sawLowLift = true;
     if (P.x < lastX - 100) note('respawn');
-    if (!fell && P.y > 900) { fell = true; note('fell'); }
-    if (fell && P.y < 780) fell = false;
-    if (P.groundId === 'dolly' && !onDolly) note('board');
+    if (!felled && P.y > 900) { felled = true; note('fell'); }
+    if (felled && P.y < 780) felled = false;
     lastX = P.x;
   }
 
@@ -151,6 +185,8 @@ function solve(index) {
     label: g.world.level.label,
     seconds: frames * DT,
     x: P.x,
+    y: P.y,
+    on: P.groundId,
     tape: W.tape,
     blades: W.cutsLeft(),
     cuts,
@@ -158,9 +194,11 @@ function solve(index) {
     door: W.exitOpen(),
     driving: W.driveRunning(),
     load: W.loadCX(),
-    y: P.y,
-    on: P.groundId,
+    plate: W.plateHeld(),
     dolly: dollyX,
+    liftY,
+    sawLowLift,
+    still,
     trace
   };
 }
@@ -178,8 +216,9 @@ for (let i = 0; i < LEVELS.length; i++) {
     `${pass ? 'ok  ' : 'FAIL'} scene ${String(i + 1).padStart(2, '0')} ${r.label}` +
     ` — ${r.state} in ${r.seconds.toFixed(1)}s, x=${r.x.toFixed(0)},` +
     ` tape=${r.tape.toFixed(1)}, blades=${r.blades}, cuts=${r.cuts}` +
-    (pass ? '' : `, y=${r.y.toFixed(0)}, on=${r.on}, dolly=${r.dolly}, t=${r.time.toFixed(1)},` +
-      ` door=${r.door}, driving=${r.driving}, load=${r.load}`) +
+    (pass ? '' : `, y=${r.y.toFixed(0)}, on=${r.on}, t=${r.time.toFixed(1)},` +
+      ` door=${r.door}, driving=${r.driving}, load=${r.load}, plate=${r.plate},` +
+      ` dolly=${r.dolly}, liftY=${r.liftY}, lowSeen=${r.sawLowLift}, still=${r.still.toFixed(2)}`) +
     (pass || !r.trace.length ? '' : `\n       trace: ${r.trace.join(' ')}`)
   );
 }
