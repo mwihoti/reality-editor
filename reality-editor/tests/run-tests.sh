@@ -70,6 +70,30 @@ for attempt in 1 2; do
   fi
 done
 
+echo "== play bot: every scene must be completable (bot.html) =="
+BOT=$(chromium --headless=new --no-sandbox --disable-gpu --hide-scrollbars \
+  --window-size=1280,720 --virtual-time-budget=160000 --dump-dom \
+  "http://127.0.0.1:$SRV_PORT/tests/bot.html" 2>/dev/null)
+BOT_TITLE=$(printf '%s' "$BOT" | sed -n 's:.*<title>\(.*\)</title>.*:\1:p' | head -1)
+printf '%s' "$BOT" | python3 -c '
+import re, sys
+h = sys.stdin.read()
+m = re.search(r"<pre id=\"out\">(.*?)</pre>", h, re.S)
+if m:
+    for line in m.group(1).split("\n"):
+        if line.strip():
+            print("     " + line)
+'
+case "$BOT_TITLE" in
+  "BOT PASS"*)
+    echo "ok   $BOT_TITLE"
+    ;;
+  *)
+    echo "FAIL ${BOT_TITLE:-the bot did not finish}"
+    fail=1
+    ;;
+esac
+
 if [ "$fail" -ne 0 ]; then
   echo "RESULT: FAIL"
   exit 1

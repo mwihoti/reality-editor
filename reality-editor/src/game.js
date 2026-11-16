@@ -37,6 +37,8 @@ export function createGame(canvas, levelsOrLevel) {
   let wasGround = false;
   let wasOpen = false;
 
+  const canContinue = () => resumeIndex(save, levels.length);
+
   const game = {
     state: 'title',              // title | playing | paused | cleared | won
     shake: 0,
@@ -49,7 +51,9 @@ export function createGame(canvas, levelsOrLevel) {
     levelCount: levels.length,
     level,
     save,
-    stats: null
+    stats: null,
+    // the scene the CONTINUE button will name: always a real one
+    continueIndex: canContinue
   };
 
   const toLogical = (clientX, clientY) => {
@@ -125,11 +129,10 @@ export function createGame(canvas, levelsOrLevel) {
     }
 
     if (game.state === 'title') {
-      const canContinue = save.unlocked > 0;
-      if (canContinue && hit(CONFIG.ui.titleContinue, click)) {
+      if (canContinue() > 0 && hit(CONFIG.ui.titleContinue, click)) {
         audio.init();
         audio.click();
-        startRun(resumeIndex(save, levels.length));
+        startRun(canContinue());
         return;
       }
       if (jumpPressed || hit(CONFIG.ui.title, click)) {
@@ -224,7 +227,8 @@ export function createGame(canvas, levelsOrLevel) {
       if (res.ok) {
         audio.cut();
         game.shake = CONFIG.feel.shakeCut;
-        if (res.ids.indexOf(level.drive.id) !== -1) audio.clunk();
+        // only scenes with a hoist have a drive wheel to clunk
+        if (level.drive && res.ids.indexOf(level.drive.id) !== -1) audio.clunk();
 
         const wallLeft = level.props.some(p => p.id.indexOf('wall-') === 0 && world.alive(p));
         if (!wallLeft && !game.wallOpened) {
@@ -319,6 +323,7 @@ export function createGame(canvas, levelsOrLevel) {
     view, cam, world, player, input, game,
     resize, step, draw,
     startRun, togglePause, nextLevel,
+    get continueIndex() { return canContinue(); },
     get save() { return save; },
     get level() { return level; },
     get state() { return game.state; }

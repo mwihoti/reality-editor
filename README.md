@@ -74,9 +74,11 @@ cd reality-editor
 ./tests/run-tests.sh
 ```
 
-102 assertions over the mechanics, all nine scenes, the progression between them and the
-save file, plus a check that runs the real `requestAnimationFrame` loop in headless Chromium
-and plays it with real input.
+110 assertions over the mechanics, all nine scenes, the progression between them, the title
+buttons and the save file; a check that runs the real `requestAnimationFrame` loop in headless
+Chromium with real input; and a play bot (`tests/bot.html`) that drives every one of the nine
+scenes to its exit through the real input path — keys for walking and rewinding, a real
+drag-and-release for every cut.
 
 ## Layout
 
@@ -85,7 +87,7 @@ reality-editor/
   index.html      the game page
   src/            config, levels (the shoot list), themes (backdrops), world (clock + cuts),
                   player, input, render, game, audio, save (localStorage progress)
-  tests/          assertions, real-loop check, staged screenshot scenes, recording bot
+  tests/          assertions, real-loop check, play bot, staged screenshot scenes, capture bot
   dist/           itch.io release zip, cover and screenshots
   PROGRESS.md     build log, test evidence, known limits
   UNREAL_PORT_PLAN.md

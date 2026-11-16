@@ -109,6 +109,27 @@ scene index), `cleared`, `best` (fastest full run) and `finished`. The title scr
 - Every save read is validated and stored in a try/catch, so private mode, a strict itch
 iframe, corrupt JSON or a hand-edited entry all degrade to a blank save instead of a crash.
 
+## The crash that stopped cuts working, and the bot that now guards it
+
+- `game.js` read `level.drive.id` on every successful cut. Only the studio and the hoist
+scenes have a drive wheel, so the first cut in any other scene threw, which killed the
+`requestAnimationFrame` loop — the game froze with the drag rectangle still on screen and no
+cut applied. Fixed by guarding the field (`level.drive && ...`).
+- The 404 in the console was the browser's automatic `/favicon.ico` request; `index.html` now
+does not request one (inline data-URI icon).
+- `tests/bot.html` is a play bot: it drives each scene with the real input path (key set for
+walking/rewinding, `input.releasedRect` for drag-cuts) and only passes when the game reports
+`cleared`/`won`. Because a throw inside `step()` aborts the page, it is also a regression
+test for exactly the crash above. All nine scenes clear, the last one ends `won`.
+- Bot policy, for the record: stand on the dolly until it reaches the far side; cut crates
+only when actually blocked (a cut every frame burned all four blades); hop only at a dolly
+parked within ~170px (a standing hop covers ~230px, so hopping at a dolly across the whole
+gap lands in it); probe a short span ahead and probe the dolly's real bounds, because a
+moving prop is a collision ghost while you rewind.
+- New assertions: pressing CONTINUE with a real pointer event starts the saved scene; the run
+timer counts up, resets to zero on a new run and climbs again; a save from a build with more
+scenes is clamped so CONTINUE names the last real scene, and pressing it starts that scene.
+
 ## Tuning findings from playing it through
 
 - **Tape was too short.** The intended route costs roughly 6s of tape rewinding the dolly and 7s parking the load, and the bot run with a 20s budget ran dry inside scene 3. `maxTape` is now **30**, which keeps the pressure without making the last puzzle unaffordable.

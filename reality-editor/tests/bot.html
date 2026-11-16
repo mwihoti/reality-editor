@@ -1,0 +1,193 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bot</title>
+<style>canvas { width: 960px; height: 540px; display: block; }</style>
+<canvas id="game"></canvas>
+<pre id="out"></pre>
+<script type="module">
+// A play bot: it drives each scene with the real input path (keys for movement
+// and rewinding, releasedRect for drag-cuts, exactly like a human release) and
+// the scene only counts as passed when the game itself reports cleared/won.
+//
+// Policy, evaluated every frame:
+//   on the dolly      -> stand until it reaches the far side, then step off
+//   crates ahead      -> drag a cut over them
+//   no floor ahead    -> hold R until the dolly rolls back to the ledge
+//   stuck, load line  -> rewind the load onto the sensor, then cut the wheel
+//   otherwise         -> walk right
+import { LEVELS } from '../src/levels.js';
+import { createGame } from '../src/game.js';
+
+const DT = 1 / 120;
+const MAX_SECONDS = 320;
+
+const cv = document.getElementById('game');
+cv.width = 1920;
+cv.height = 1080;
+const g = createGame(cv, LEVELS);
+g.resize();
+
+const toScreen = (r) => {
+  const z = g.cam.zoom || 1;
+  return {
+    x: (r.x - g.cam.x - 960) * z + 960,
+    y: (r.y - 540) * z + 540,
+    w: r.w * z,
+    h: r.h * z
+  };
+};
+
+function union(rects) {
+  const x = Math.min(...rects.map(r => r.x)) - 24;
+  const y = Math.min(...rects.map(r => r.y)) - 24;
+  const x2 = Math.max(...rects.map(r => r.x + r.w)) + 24;
+  const y2 = Math.max(...rects.map(r => r.y + r.h)) + 24;
+  return { x, y, w: x2 - x, h: y2 - y };
+}
+
+function solve(index) {
+  g.startRun(index);
+  const W = g.world;
+  const P = g.player;
+  const keys = g.input.keys;
+
+  let frames = 0;
+  let lastX = P.x;
+  let still = 0;
+  let cuts = 0;
+  let cutCool = 0;
+  let jumpCool = 0;
+  let fell = false;
+  let dollyX = null;
+  let pulling = false;   // one continuous rewind, not a twitch every frame
+  const trace = [];
+  const note = (what) => { if (trace.length < 10) trace.push(`${what}@${P.x.toFixed(0)}`); };
+  const maxFrames = Math.round(MAX_SECONDS / DT);
+
+  while (g.state === 'playing' && frames < maxFrames) {
+    keys.clear();
+
+    const dolly = W.byId('dolly');
+    const dollyS = dolly ? W.stateAt(dolly, W.time) : null;
+    dollyX = dollyS ? dollyS.x : null;
+    const onDolly = P.groundId === 'dolly';
+    const solids = W.solids(P.groundId);
+    const probeY = P.y + P.h + 12;
+    const over = (s, x) => x >= s.x && x <= s.x + s.w && probeY >= s.y - 6 && probeY <= s.y + s.h;
+    // A dolly can be a ghost (mid-rewind) and can park a few pixels off the
+    // ledge, so probe a short span ahead and include the dolly's real bounds.
+    const floorAhead = [8, 20, 32].some(dx => {
+      const x = P.x + P.w + dx;
+      return solids.some(s => over(s, x)) || (dollyS ? over(dollyS, x) : false);
+    });
+    const dollyGap = dollyS ? dollyS.x - (P.x + P.w) : Infinity;
+    if (floorAhead) pulling = false;
+
+    const crates = W.cuttableProps().filter(p =>
+      p.kind === 'crate'
+      && p.x + p.w > P.x + P.w - 6
+      && p.x < P.x + P.w + 360
+      && p.y + p.h > P.y - 30
+      && p.y < P.y + P.h + 30);
+
+    let cut = null;
+
+    if (onDolly) {
+      if (dolly.motion && dollyS.x >= dolly.motion.to - 26) keys.add('KeyD');
+    } else if (still > 0.2 && crates.length && W.cutsLeft() > 0 && cutCool <= 0) {
+      cut = union(crates.map(p => W.stateAt(p, W.time)));
+      cutCool = 0.5;
+    } else if (!floorAhead && dolly && dollyGap > 4 && dollyGap <= 170 && still > 0.15) {
+      // parked just out of walking reach: a short hop lands on it (the jump
+      // covers ~230px, so never hop at a dolly parked across the whole gap)
+      keys.add('KeyD');
+      if (P.onGround && jumpCool <= 0) {
+        keys.add('Space');
+        jumpCool = 0.5;
+      }
+    } else if (!floorAhead) {
+      // only the dolly decides when you can cross; pull it in one go, and if
+      // the tape ran out mid-pull, wait for the rescue refill instead of
+      // twitching R against an empty gauge forever
+      if (dolly) {
+        if (pulling && W.tape <= 0.02) pulling = false;
+        if (!pulling && W.tape > 14) pulling = true;
+        if (pulling) keys.add('KeyR');
+      }
+    } else if (still > 0.35 && W.hasMechanism() && W.driveRunning()) {
+      // park the load well inside the window, then cut: a cut on the very edge
+      // leaves the shutter shut again the moment the clock moves on
+      const pad = Math.abs(W.loadCX() - W.level.sensorCX);
+      if (pad < 30) {
+        cut = union([W.stateAt(W.byId('wheel'), W.time)]);
+      } else if (W.tape > 0.02) {
+        keys.add('KeyR');
+      }
+    } else {
+      keys.add('KeyD');
+    }
+
+    if (cut) {
+      g.input.releasedRect = toScreen(cut);
+      cuts++;
+    }
+
+    g.step(DT);
+    frames++;
+    cutCool = Math.max(0, cutCool - DT);
+    jumpCool = Math.max(0, jumpCool - DT);
+
+    if (Math.abs(P.x - lastX) < 0.4) still += DT;
+    else still = 0;
+    if (P.x < lastX - 100) note('respawn');
+    if (!fell && P.y > 900) { fell = true; note('fell'); }
+    if (fell && P.y < 780) fell = false;
+    if (P.groundId === 'dolly' && !onDolly) note('board');
+    lastX = P.x;
+  }
+
+  return {
+    state: g.state,
+    label: g.world.level.label,
+    seconds: frames * DT,
+    x: P.x,
+    tape: W.tape,
+    blades: W.cutsLeft(),
+    cuts,
+    time: W.time,
+    door: W.exitOpen(),
+    driving: W.driveRunning(),
+    load: W.loadCX(),
+    y: P.y,
+    on: P.groundId,
+    dolly: dollyX,
+    trace
+  };
+}
+
+const out = [];
+const results = [];
+let failed = 0;
+
+for (let i = 0; i < LEVELS.length; i++) {
+  const r = solve(i);
+  const pass = r.state === 'cleared' || r.state === 'won';
+  if (!pass) failed++;
+  results.push(r);
+  out.push(
+    `${pass ? 'ok  ' : 'FAIL'} scene ${String(i + 1).padStart(2, '0')} ${r.label}` +
+    ` — ${r.state} in ${r.seconds.toFixed(1)}s, x=${r.x.toFixed(0)},` +
+    ` tape=${r.tape.toFixed(1)}, blades=${r.blades}, cuts=${r.cuts}` +
+    (pass ? '' : `, y=${r.y.toFixed(0)}, on=${r.on}, dolly=${r.dolly}, t=${r.time.toFixed(1)},` +
+      ` door=${r.door}, driving=${r.driving}, load=${r.load}`) +
+    (pass || !r.trace.length ? '' : `\n       trace: ${r.trace.join(' ')}`)
+  );
+}
+
+out.push('');
+out.push(failed === 0
+  ? `BOT PASS all ${LEVELS.length} scenes completed`
+  : `BOT FAIL ${failed} of ${LEVELS.length} scenes could not be completed`);
+document.getElementById('out').textContent = out.join('\n');
+document.title = failed === 0 ? `BOT PASS ${LEVELS.length}/${LEVELS.length}` : `BOT FAIL ${failed}`;
+</script>

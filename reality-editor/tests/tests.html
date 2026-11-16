@@ -453,6 +453,55 @@ S.clearSave();
 ok('progress can be wiped', S.readSave().unlocked === 0 && S.readSave().best === null);
 ok('the title has a continue button', CONFIG.ui.titleContinue.length === 1);
 
+// ---- N. the title buttons and the run timer --------------------------------
+function pressButton(g, canvas, lx, ly) {
+  const r = canvas.getBoundingClientRect();
+  const x = r.left + g.view.ox + lx * g.view.scale;
+  const y = r.top + g.view.oy + ly * g.view.scale;
+  if (canvas.setPointerCapture) canvas.setPointerCapture = () => {};
+  const base = { clientX: x, clientY: y, button: 0, pointerId: 11, pointerType: 'mouse', bubbles: true };
+  canvas.dispatchEvent(new PointerEvent('pointerdown', { ...base, buttons: 1 }));
+  canvas.dispatchEvent(new PointerEvent('pointerup', { ...base, buttons: 0 }));
+}
+const continueBtn = CONFIG.ui.titleContinue[0];
+const centreOf = (b) => [b.x + b.w / 2, b.y + b.h / 2];
+
+g2.game.state = 'title';
+g2.save.unlocked = 4;
+ok('CONTINUE names the saved scene', g2.game.continueIndex() === 4, `${g2.game.continueIndex()}`);
+
+pressButton(g2, cv2, ...centreOf(continueBtn));
+st2(2);
+ok('pressing CONTINUE starts the saved scene',
+  g2.state === 'playing' && g2.game.levelIndex === 4 && g2.world.level.label === LEVELS[4].label,
+  `${g2.state} #${g2.game.levelIndex} ${g2.world.level.label}`);
+
+// the timer belongs to a run, not to the tab
+st2(360);
+const ran = g2.game.playTime;
+ok('the run timer counts up while playing', ran > 2.5, ran.toFixed(2));
+
+g2.startRun(4);
+ok('starting a run resets the run timer', g2.game.playTime === 0, `${g2.game.playTime}`);
+st2(120);
+ok('the timer climbs again from zero',
+  g2.game.playTime > 0.5 && g2.game.playTime < 1.5, g2.game.playTime.toFixed(2));
+
+// a save written by a build with more scenes must never name a scene that is not here
+g2.save.unlocked = 99;
+ok('a too-high save is clamped to the last scene',
+  g2.game.continueIndex() === LEVELS.length - 1, `${g2.game.continueIndex()}`);
+
+g2.game.state = 'title';
+pressButton(g2, cv2, ...centreOf(continueBtn));
+st2(2);
+ok('CONTINUE at the clamp starts the last scene',
+  g2.state === 'playing' && g2.game.levelIndex === LEVELS.length - 1,
+  `${g2.state} #${g2.game.levelIndex}`);
+ok('and it is a scene that exists',
+  !!LEVELS[g2.game.levelIndex] && !!LEVELS[g2.game.levelIndex].label,
+  LEVELS[g2.game.levelIndex] ? LEVELS[g2.game.levelIndex].label : 'missing');
+
 document.getElementById('out').textContent = out.join('\n');
 document.title = fail === 0 ? `TESTS PASS ${pass}/${pass}` : `TESTS FAIL ${fail}`;
 </script>

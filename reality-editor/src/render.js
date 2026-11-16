@@ -820,7 +820,8 @@ function drawTitle(ctx, game, input, now) {
     'rgba(255,241,222,.72)', 'center');
 
   const b = CONFIG.ui.title[0];
-  const saved = game.save ? game.save.unlocked : 0;
+  // clamped by the game, so the button can never name a scene that isn't there
+  const saved = game.continueIndex ? game.continueIndex() : 0;
   const startLabel = saved > 0 ? 'START FROM SCENE 01' : b.label;
   drawButton(ctx, { ...b, label: startLabel }, hovered(CONFIG.ui.title, input.pointer) === b, now);
 
