@@ -9,6 +9,9 @@ image assets — every sound is synthesised in code.
 
 > This is a browser prototype, not an Unreal Engine or UEFN build. The port plan for a UE
 > 5.9 version lives in [`reality-editor/UNREAL_PORT_PLAN.md`](reality-editor/UNREAL_PORT_PLAN.md).
+>
+> Submitting this to a hackathon? The write-up, pitch and required actions are in
+> [`HACKATHON_SUBMISSION.md`](HACKATHON_SUBMISSION.md).
 
 ## Play
 
