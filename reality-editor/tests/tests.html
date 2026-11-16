@@ -407,12 +407,29 @@ ok('the second scene loads', g2.world.level.label === 'THE CLEARING' && g2.state
 // the gate is a real obstacle: low bar across the walk
 const gate = g2.world.level.props.find(p => p.kind === 'gate');
 ok('the new scene has a gate', !!gate && gate.kind === 'gate');
-g2.world.time = 0;                    // bottom of the cycle: the bar is down
+// bottom of the cycle: work it out from the motion, not from the phase
+const gm = gate.motion;
+const uLow = gm.hold + (1 - gm.hold) / 2;
+let tLow = (uLow - gm.phase) * gm.period;
+if (tLow <= 0) tLow += gm.period;
+g2.world.time = tLow;                 // the bar is at its lowest here
 g2.player.place(1050, 726);
 g2.input.keys.add('KeyD');
-st2(240);
+st2(30);                              // a quarter second, while it is still down
 g2.input.keys.delete('KeyD');
 ok('a dropped gate stops the walk', g2.player.x < 1140, `x=${g2.player.x.toFixed(0)}`);
+
+// ...and the bar really does lift clear, or the scene would be a dead end
+const uClear = gm.hold / 2;
+let tClear = (uClear - gm.phase) * gm.period;
+if (tClear <= 0) tClear += gm.period;
+g2.world.time = tClear;
+g2.player.place(1050, 726);
+g2.input.keys.add('KeyD');
+st2(90);
+g2.input.keys.delete('KeyD');
+ok('the gate lifts and the walk goes through', g2.player.x > gate.x + gate.w,
+  `x=${g2.player.x.toFixed(0)} gateEnd=${(gate.x + gate.w).toFixed(0)}`);
 
 g2.player.place(g2.level.exit.x + 120, 726);
 st2(6);

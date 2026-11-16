@@ -41,6 +41,8 @@ function go() {
   if (scene === 'level') {
     const at = Number(q.get('x') || 0);
     g.player.place(at || g.level.spawn.x + 240, 726);
+    const at_t = Number(q.get('t') || 0);
+    if (at_t) g.world.time = at_t;
     settle();
     g.cam.x = Math.max(0, g.player.x - 760);
     return;

@@ -179,7 +179,11 @@ export const LEVELS = [
   makeLevel({
     label: 'THE CLEARING', theme: 'forest', width: 2600,
     floors: [[-160, 2760]],
-    gates: [{ x: 1180, period: 7.5, phase: 0.5 }],
+    // phase chosen so the bar is DOWN when the player reaches it (~world 33s).
+    // With phase 0.5 the bar's whole low window passed while the player was
+    // still crossing the room, so the gate was decorative and the rewind the
+    // hint asks for did nothing at all.
+    gates: [{ x: 1180, period: 7.5, phase: 0.24 }],
     exitX: 2100,
     hints: [gateHint(600, 1500, { x: 1180, y: 300 })]
   }),
@@ -254,7 +258,10 @@ export const LEVELS = [
   makeLevel({
     label: 'LAST TAKE', theme: 'beach', width: 3400,
     floors: [[-160, 2460]],
-    dolly: { from: 700, to: 1500, startTime: 20, speed: 90 },
+    // the finale stacks three objects, so its pad is the most generous in the
+    // game: at speed 90 the door held for 4s and the run through it was down
+    // to a frame; 60 gives 6s, which leaves the dash some slack
+    dolly: { from: 700, to: 1500, startTime: 20, speed: 60 },
     plate: { x: 700, w: 360 },
     relay: { x: 1300 },
     gates: [{ x: 1700, period: 7, phase: 0.65 }],

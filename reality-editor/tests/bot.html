@@ -144,10 +144,14 @@ function solve(index) {
       }
     } else if (!floorAhead) {
       const parked = dollyS && dollyS.x <= dolly.motion.from + 2;
-      if (dolly && parked && dollyGap > 4 && dollyGap <= 200 && still > 0.15) {
+      if (lift && nearLift) {
+        // a lift is the way over: stand still, its next dwell is seconds away.
+        // (This is the finale's gap: reaching for the dolly here burned the
+        // whole tape pulling back a dolly that is only dead weight on a pad.)
+      } else if (dolly && parked && dollyGap > 4 && dollyGap <= 200 && still > 0.15) {
         keys.add('KeyD');
         if (P.onGround && jumpCool <= 0) { keys.add('Space'); jumpCool = 0.5; }
-      } else if (dolly && W.tape > 0.02) {
+      } else if (dolly && !lift && W.tape > 0.02) {
         keys.add('KeyR');                     // pull the dolly back to the ledge
       }
       // a lift: just stand still, its next dwell is only seconds away

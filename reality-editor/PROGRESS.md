@@ -142,6 +142,30 @@ Bot results after the redesign (all through the real input path):
 
 118 assertions plus the bot, all passing.
 
+## Tuning pass: the finale's window and a gate that never gated
+
+**The finale burned its whole tape.** LAST TAKE took the bot 88.8s and left tape at 0.0.
+Two causes, both measured before touching anything:
+
+- At the lip of the lift hole the bot's "no floor ahead → rewind for the dolly" branch
+fired. In THE TIDE there is no dolly so it just waited; in the finale a dolly exists but is
+dead weight 900px back on a pad, so the bot rewound the entire tape looking for a ride that
+was never coming. The branch now only reaches for the dolly when there is no lift nearby.
+- The pad window was 4s of clock (dolly at 90px/s across a 360px pad). Loosened to 6s by
+slowing the dolly to 60: the door is now the most generous in the game, which is right for
+the scene that stacks three objects. 88.8s/0.0 tape → **25.8s/24.2 tape**.
+
+**Scene 2's gate never gated.** With phase 0.5 the bar's low window was world 30.3–32.8s,
+while the player cannot reach x=1180 before ~33s. Measured: the walk cleared in 5.9s with the
+bar above head height the whole way, and the rewind the hint advertises did nothing but cost
+tape. Phase is now 0.24, so the bar is down when you arrive (blocked on arrival, ~1.9s pinned
+if you wait) and a rewind into the dwell crosses in 3.9s versus 5.2s on foot. The scene is
+always solvable by waiting, and the rewind is now the fast answer rather than a no-op.
+
+The gate test learns the phase instead of assuming it: it derives the bar's lowest point from
+the motion, checks the player is stopped while the bar is down, then checks the dwell actually
+lets them through. That pair is what would have caught the decorative gate in the first place.
+
 ## The crash that stopped cuts working, and the bot that now guards it
 
 - `game.js` read `level.drive.id` on every successful cut. Only the studio and the hoist
