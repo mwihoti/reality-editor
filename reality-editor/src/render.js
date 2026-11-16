@@ -342,8 +342,8 @@ function drawSensor(ctx, s, game) {
   // chevrons
   ctx.strokeStyle = load > 0.05 ? 'rgba(20,60,50,.55)' : 'rgba(36,29,46,.5)';
   ctx.lineWidth = 4;
-  for (let i = 0; i < 3; i++) {
-    const x = s.x + 18 + i * 24;
+  for (let i = 0; i < 5; i++) {
+    const x = s.x + 18 + i * 30;
     ctx.beginPath();
     ctx.moveTo(x, s.y + 2);
     ctx.lineTo(x + 9, s.y + 9);

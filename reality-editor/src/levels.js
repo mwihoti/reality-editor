@@ -106,7 +106,7 @@ function makeLevel(spec) {
   if (spec.crane) {
     const c = spec.crane;
     props.push({ id: 'rail', kind: 'rail', x: c.railX, y: 516, w: c.railW, h: 18, solid: false, cuttable: false });
-    props.push({ id: 'sensor', kind: 'sensor', x: c.sensorCX - 42, y: 516, w: 84, h: 18, solid: false, cuttable: false });
+    props.push({ id: 'sensor', kind: 'sensor', x: c.sensorCX - 80, y: 516, w: 160, h: 18, solid: false, cuttable: false });
     props.push({ id: 'wheel', kind: 'wheel', x: c.wheelX, y: 542, w: 124, h: 124, solid: false, cuttable: true });
     level.drive = { id: 'wheel' };
     level.load = { anchorCX: c.anchorCX, minCX: c.minCX, speed: 45, size: 84, hangY: 566 };

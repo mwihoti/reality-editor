@@ -33,9 +33,11 @@ export const CONFIG = {
   // the weight leaves the pad. Without it the door shuts on the same frame the
   // rewind ends, so stopping the scrub the moment it opens gives you no runway.
   // sensorHalfWindow is the trigger zone's half-width; it must match the sensor
-  // pad's half-width (84/2 in levels.js). At 80 it lit LOADED while the crate
-  // visibly hung beside the pad.
-  mechanism: { sensorHalfWindow: 42, sensorLoadDisplay: 0.9, relayGrace: 3 },
+  // pad's half-width (160/2 in levels.js and level.js). A narrower pad visual
+  // than the zone made it light LOADED while the crate hung beside the pad;
+  // a narrower zone than the pad made the wheel cut almost impossible for a
+  // human (the load crossed it in under a second) and the gate never opened.
+  mechanism: { sensorHalfWindow: 80, sensorLoadDisplay: 0.9, relayGrace: 3 },
 
   feel: {
     cutFlash: 0.22,

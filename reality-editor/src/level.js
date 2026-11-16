@@ -63,7 +63,7 @@ export const LEVEL = {
 
     // ---- puzzle 3: the final edit ----------------------------------------
     { id: 'rail', kind: 'rail', x: 2740, y: 516, w: 660, h: 18, solid: false, cuttable: false },
-    { id: 'sensor', kind: 'sensor', x: 3060, y: 516, w: 84, h: 18, solid: false, cuttable: false },
+    { id: 'sensor', kind: 'sensor', x: 3022, y: 516, w: 160, h: 18, solid: false, cuttable: false },
     { id: 'wheel', kind: 'wheel', x: 2700, y: 542, w: 124, h: 124, solid: false, cuttable: true },
     { id: 'frame', kind: 'frame', x: 3452, y: 566, w: 160, h: 254, solid: false, cuttable: false },
     { id: 'shutter', kind: 'shutter', x: 3496, y: 600, w: 64, h: 220, solid: true, cuttable: false }
