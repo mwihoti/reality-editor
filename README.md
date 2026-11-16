@@ -65,6 +65,3 @@ reality-editor/
   UNREAL_PORT_PLAN.md
   ITCH_PAGE.md
 ```
-
-The `index.html` at the repository root is an unrelated older demo; the game is in
-`reality-editor/`.
