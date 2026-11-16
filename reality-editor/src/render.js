@@ -586,6 +586,15 @@ function hintFor(world, player) {
     };
   }
   if (world.progress.scene2 && !world.progress.won && px > 2260) {
+    if (!world.driveRunning() && !world.exitOpen()) {
+      return {
+        x: 3120, y: 292, anchor: 'down',
+        lines: ['THE LINE IS FROZEN OFF THE SENSOR'],
+        sub: world.tape > 0.2
+          ? 'rewind past the cut — the wheel comes back'
+          : 'wait for the tape to refill, then rewind past the cut'
+      };
+    }
     if (world.exitOpen()) {
       return {
         x: 3120, y: 300, anchor: 'down',
@@ -765,7 +774,7 @@ function drawHUD(ctx, s) {
   text(ctx, `${world.tape.toFixed(1)}s`, barX + barW + 16, barY + 9, 14, 'rgba(255,241,222,.7)');
 
   if (world.tape <= 0.001) {
-    text(ctx, 'TAPE SPENT — BACKSPACE TO RESET', 1240, barY - 22, 16, P.coral, 'center');
+    text(ctx, 'TAPE SPENT — LET THE TAKE RUN TO REFILL', 1240, barY - 22, 16, P.coral, 'center');
   }
 
   // hints (keyboard layout) or a touch note

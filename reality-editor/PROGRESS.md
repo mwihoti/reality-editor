@@ -49,16 +49,16 @@ Run the tests: `tests/run-tests.sh` (headless Chromium + Node).
 
 ```
 == deterministic suite (tests.html) ==
-ok   TESTS PASS 76/76
+ok   TESTS PASS 78/78
 == real animation-frame loop (loop.html) ==
-     frames=176 state=playing moved=true cut=true rewinding=true x=250.9 time=18.08 tape=22.47 blades=4
+     frames=183 state=playing moved=true cut=true rewinding=true x=250.9 time=18.27 tape=22.58 blades=4
 ok   the game runs on real requestAnimationFrame frames
 RESULT: PASS
 ```
 
 The real-loop check runs the actual `main.js` animation loop in headless Chromium over CDP (no manual stepping), holds real keys, cuts, and rewinds.
 
-The 76 assertions cover: boot/start, walk, jump, landing, drag-cut pruning, cut eligibility by prop anchor, blade spend/refund/exhaustion, rewind rate (1.6x +-0.06 measured 1.58), tape spend and floor, restore-on-rewind, re-apply-on-play, pure prop motion, moving props ghosting while rewinding, player not rewound, all three puzzles end to end, shutter/sensor state, win state, pause freeze, restart, start button, and fall respawn.
+The 78 assertions cover: boot/start, walk, jump, landing, drag-cut pruning, cut eligibility by prop anchor, blade spend/refund/exhaustion, rewind rate (1.6x +-0.06 measured 1.58), tape spend and floor, restore-on-rewind, re-apply-on-play, pure prop motion, moving props ghosting while rewinding, player not rewound, all three puzzles end to end, shutter/sensor state, win state, pause freeze, restart, start button, and fall respawn.
 
 Screenshots: `shot-title.png`, `shot-wall.png`, `shot-gap.png`, `shot-final.png`, `shot-won.png`, `shot-pause.png`, `shot-touch.png` (produced from `tests/stage.html`, which sets up each state and draws it).
 
@@ -82,6 +82,20 @@ A player reported being unable to cross the gap. Three separate faults, all fixe
 A riding hint (`STAND STILL — IT CARRIES YOU`) appears while you stand on the dolly. Walking
 forward off its front edge mid-ride is still a fall — the checkpoint makes it cheap, and the
 hint tells you not to.
+
+## Dead-end fixed: tape can be refilled (scene 3)
+
+A second playtest screenshot showed a run that could not be finished: the drive
+wheel had been cut while the load was **off** the sensor, so the line was frozen
+in the wrong place, and the tape was at 0.0 — with no way to rewind past the cut
+and undo it. The only escape was Backspace, which throws away scenes 1 and 2.
+
+- Tape now recovers at **0.4 s per second of forward play** (`rules.tapeRefill`), so
+a spent tape is a delay, not a dead run. It is still a hard budget *in the moment*:
+while you hold R nothing refills.
+- The HUD says `TAPE SPENT — LET THE TAKE RUN TO REFILL` instead of pointing at a reset.
+- When the drive wheel is cut and the sensor is not loaded, the hint says so:
+`THE LINE IS FROZEN OFF THE SENSOR` — *rewind past the cut* (or wait for tape).
 
 ## Tuning findings from playing it through
 

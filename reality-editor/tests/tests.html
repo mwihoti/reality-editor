@@ -167,6 +167,19 @@ press('KeyR'); steps(60); release('KeyR');
 ok('tape never goes negative', g.world.tape >= 0);
 ok('rewind stops when the tape is spent', !g.world.rewinding || g.world.tape === 0);
 
+// tape recovers while the take plays, so a spent tape is never a dead end
+release('KeyR');
+steps(2);
+g.world.tape = 2.0;
+const rec0 = g.world.tape;
+steps(240);
+ok('the tape refills while the take runs', g.world.tape > rec0 + 0.3,
+  `tape=${g.world.tape.toFixed(2)}`);
+g.world.tape = CONFIG.rules.maxTape - 0.05;
+steps(120);
+ok('the tape never refills past its cap',
+  g.world.tape <= CONFIG.rules.maxTape + 1e-9, `tape=${g.world.tape.toFixed(2)}`);
+
 // ---- D. puzzle 1: the impossible wall ------------------------------------
 g.startRun();
 g.player.place(700, 726);

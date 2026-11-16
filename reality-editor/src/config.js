@@ -24,7 +24,10 @@ export const CONFIG = {
 
   // tape budget: the intended route spends ~6s rewinding the dolly and ~7s
   // parking the load, so 30 leaves room for a player who takes their time
-  rules: { maxCuts: 4, maxTape: 30, rewindRate: 1.6, startTime: 30 },
+  // tapeRefill: tape seconds recovered per second of forward play. Without it
+  // a run that spends the last of its tape can only be recovered by resetting
+  // the whole room, which is too harsh for a mistake in the last scene.
+  rules: { maxCuts: 4, maxTape: 30, rewindRate: 1.6, startTime: 30, tapeRefill: 0.4 },
 
   mechanism: { sensorHalfWindow: 80, sensorLoadDisplay: 0.9 },
 

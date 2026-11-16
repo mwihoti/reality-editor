@@ -41,6 +41,11 @@ export class World {
       this.time += dt;
     }
 
+    // the take records while it plays, so spent tape comes back slowly
+    if (!canRewind) {
+      this.tape = Math.min(CONFIG.rules.maxTape, this.tape + dt * CONFIG.rules.tapeRefill);
+    }
+
     const now = performance.now() / 1000;
     if (this.fx.length) this.fx = this.fx.filter(f => now - f.born < CONFIG.feel.cutGhost);
     if (this.toasts.length) this.toasts = this.toasts.filter(t => now - t.born < CONFIG.feel.toast);
