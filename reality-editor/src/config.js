@@ -43,7 +43,8 @@ export const CONFIG = {
   respawn: { belowRoom: 260 },
 
   ui: {
-    title: [{ id: 'start', x: 760, y: 720, w: 400, h: 96, label: 'START GAME' }],
+    title: [{ id: 'start', x: 700, y: 712, w: 520, h: 96, label: 'START GAME' }],
+    titleContinue: [{ id: 'continue', x: 700, y: 832, w: 520, h: 84, label: 'CONTINUE' }],
     pause: [
       { id: 'resume', x: 660, y: 600, w: 600, h: 88, label: 'RESUME' },
       { id: 'restart', x: 660, y: 712, w: 600, h: 88, label: 'RESTART SCENE' }

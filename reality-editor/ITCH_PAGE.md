@@ -4,7 +4,7 @@ Everything needed for the page is built by `python3 tools/make_itch_release.py`:
 
 | File | What it is | Where it goes on itch |
 |---|---|---|
-| `dist/RealityEditor_web.zip` (18 KiB) | The HTML5 build, `index.html` at the top level, 10 files total | Uploads → check **“This file will be played in the browser”** |
+| `dist/RealityEditor_web.zip` (26 KiB) | The HTML5 build, `index.html` at the top level, 13 files total | Uploads → check **“This file will be played in the browser”** |
 | `dist/itch-media/cover.png` (630×500) | Cover art | Cover image |
 | `dist/itch-media/screen-wall.png` … `screen-title.png` (1280×720) | Five screenshots | Screenshots |
 | `gameplay.webm` (~36 s, 1280×577) | Gameplay clip | **Not directly uploadable** — see *Video* below |
@@ -76,8 +76,9 @@ Click the game once so it has keyboard focus.
 
 A browser prototype: Canvas 2D, no engine, no libraries, no image assets — every sound is
 synthesised in code. Nine scenes over four backdrop sets (studio, forest, city, town,
-beach), about five to fifteen minutes in total. Built as a design proof for a larger
-version, so the scenes are short on purpose.
+beach), about five to fifteen minutes in total. Progress and your best full run are saved in
+your browser, so CONTINUE on the title screen picks up at the last scene you reached. Built
+as a design proof for a larger version, so the scenes are short on purpose.
 ```
 
 ## 3. Video
@@ -96,7 +97,7 @@ Only the account-owned actions — I can't sign in as you, and I won't ask for c
 
 1. **Log in to itch.io** (or create the account) and create the project.
 2. **Upload** `dist/RealityEditor_web.zip` and tick the browser-playable box.
-3. **Upload the media**: cover, the five screenshots, and the video link (after putting the clip on YouTube).
+3. **Upload the media**: cover, the nine screenshots, and the video link (after putting the clip on YouTube).
 4. **Fill the metadata** listed in section 1 — genre, tags, inputs, session length, release date.
 5. **Answer itch's AI-content disclosure** honestly. The truthful answer: the code, visuals and audio were produced with an AI coding agent, with no third-party IP. That question is on you to answer, not me.
 6. **Publish.** Publish sets the page live; a draft is invisible, so nothing is exposed until you press it.

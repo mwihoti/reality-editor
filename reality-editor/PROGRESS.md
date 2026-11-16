@@ -97,6 +97,18 @@ while you hold R nothing refills.
 - When the drive wheel is cut and the sensor is not loaded, the hint says so:
 `THE LINE IS FROZEN OFF THE SENSOR` — *rewind past the cut* (or wait for tape).
 
+## The shoot list and the save file
+
+- **Nine scenes.** The studio plus eight, over forest / city / town / beach backdrops
+(`src/themes.js`, painted per location, still no image assets). Clearing a scene shows
+`SCENE CLEARED — n in the can · m to go` and loads the next; the ninth ends on the wrap card.
+- **Tape only refills once fully spent** (`world.rescue` latch), so the budget still bites.
+- **Progress is saved** to `localStorage` under `reality-editor.v1`: `unlocked` (furthest
+scene index), `cleared`, `best` (fastest full run) and `finished`. The title screen shows
+`CONTINUE · SCENE 0N` once anything is unlocked, and the wrap screen shows `BEST RUN`.
+- Every save read is validated and stored in a try/catch, so private mode, a strict itch
+iframe, corrupt JSON or a hand-edited entry all degrade to a blank save instead of a crash.
+
 ## Tuning findings from playing it through
 
 - **Tape was too short.** The intended route costs roughly 6s of tape rewinding the dolly and 7s parking the load, and the bot run with a 20s budget ran dry inside scene 3. `maxTape` is now **30**, which keeps the pressure without making the last puzzle unaffordable.
@@ -109,9 +121,12 @@ while you hold R nothing refills.
 - Touch layout is drawn and wired but was not exercised on a real touch device.
 - The win state is reachable only through the intended puzzle order (the corridor is gated); if a player exhausts all tape in scene 3 they restart with Backspace, which is always available.
 - The sensor window in scene 3 is generous (80px), but the load leaves it again as soon as the clock runs forward, so the cut has to land while the load is parked over the pad.
+- Save data is per browser and per origin. Local progress under `localhost:8124` does not
+carry over to the itch embed, which runs on a different origin.
+- The save has no in-game reset button yet; clearing site data is the only wipe.
 
 ## Next steps
 
 1. Play all nine scenes by hand and tune tape/blade numbers (config only).
-2. Add a second room if the mechanics hold up.
+2. Playtest scenes 3–9 by hand at real speed and tune their gaps and tape costs.
 3. Start the Unreal port from `UNREAL_PORT_PLAN.md`.

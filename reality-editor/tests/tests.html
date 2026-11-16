@@ -419,6 +419,40 @@ st2(6);
 ok('finishing the last scene ends the run', g2.state === 'won',
   `${g2.world.level.label} ${g2.state}`);
 
+// ---- M. the save file ------------------------------------------------------
+const S = await import('../src/save.js');
+S.clearSave();
+ok('a fresh browser has no progress',
+  S.readSave().unlocked === 0 && !S.readSave().finished && S.readSave().best === null);
+
+// play scene 2 to its door and see what actually landed on disk
+g2.startRun(1);
+g2.player.place(g2.level.exit.x + 120, 726);
+st2(6);
+// (earlier tests in this page cleared other scenes, so check what this run added)
+const disk = S.readSave();
+ok('clearing a scene writes progress', disk.cleared.includes(1) && disk.unlocked >= 2,
+  `unlocked=${disk.unlocked} cleared=${disk.cleared}`);
+
+S.writeSave({ unlocked: 3, cleared: [0, 1, 2], best: { time: 312.4 }, finished: false });
+const s1 = S.readSave();
+ok('progress survives a reload', s1.unlocked === 3 && s1.cleared.length === 3 &&
+  Math.abs(s1.best.time - 312.4) < 1e-9);
+
+S.writeSave({ unlocked: 99, cleared: [0, 2, 2, 'x', -1], best: { time: 0 } });
+const s2 = S.readSave();
+ok('a damaged save is cleaned up', s2.cleared.length === 2 && s2.best === null,
+  JSON.stringify(s2));
+ok('a saved scene past the end is clamped down', S.resumeIndex(s2, 9) === 8,
+  `${S.resumeIndex(s2, 9)}`);
+
+localStorage.setItem('reality-editor.v1', '{not json');
+ok('an unreadable save is ignored', S.readSave().unlocked === 0);
+
+S.clearSave();
+ok('progress can be wiped', S.readSave().unlocked === 0 && S.readSave().best === null);
+ok('the title has a continue button', CONFIG.ui.titleContinue.length === 1);
+
 document.getElementById('out').textContent = out.join('\n');
 document.title = fail === 0 ? `TESTS PASS ${pass}/${pass}` : `TESTS FAIL ${fail}`;
 </script>

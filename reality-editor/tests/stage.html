@@ -15,6 +15,13 @@ const q = new URLSearchParams(location.search);
 const scene = q.get('scene') || 'title';
 const lv = Number(q.get('level') || 0);
 
+// ?save=1 seeds local progress so the continue button and the best-run row
+// can be photographed
+if (q.get('save')) {
+  const { writeSave } = await import('../src/save.js');
+  writeSave({ unlocked: 4, cleared: [0, 1, 2, 3], best: { time: 214 }, finished: false });
+}
+
 const g = createGame(document.getElementById('game'), LEVELS);
 g.resize();
 

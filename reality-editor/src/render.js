@@ -820,9 +820,18 @@ function drawTitle(ctx, game, input, now) {
     'rgba(255,241,222,.72)', 'center');
 
   const b = CONFIG.ui.title[0];
-  drawButton(ctx, b, hovered(CONFIG.ui.title, input.pointer) === b, now);
+  const saved = game.save ? game.save.unlocked : 0;
+  const startLabel = saved > 0 ? 'START FROM SCENE 01' : b.label;
+  drawButton(ctx, { ...b, label: startLabel }, hovered(CONFIG.ui.title, input.pointer) === b, now);
 
-  text(ctx, `browser prototype · ${game.levelCount || 9} scenes · not an Unreal build`, 960, 900, 16,
+  if (saved > 0) {
+    const c = CONFIG.ui.titleContinue[0];
+    const sceneNo = String(saved + 1).padStart(2, '0');
+    drawButton(ctx, { ...c, label: `CONTINUE · SCENE ${sceneNo}` },
+      hovered(CONFIG.ui.titleContinue, input.pointer) === c, now);
+  }
+
+  text(ctx, `browser prototype · ${game.levelCount || 9} scenes · not an Unreal build`, 960, 985, 16,
     'rgba(255,241,222,.35)', 'center');
 }
 
@@ -861,6 +870,13 @@ function drawWon(ctx, game, input, cleared = false) {
     ['BLADES LEFT', `${st.blades}`],
     ['TAPE LEFT', `${st.tape.toFixed(1)}s`]
   ];
+
+  const best = game.save && game.save.best;
+  if (!cleared && best) {
+    const bm = Math.floor(best.time / 60);
+    const bs = Math.floor(best.time % 60);
+    rows.push(['BEST RUN', `${bm}:${String(bs).padStart(2, '0')}`]);
+  }
   rows.forEach((r, i) => {
     const y = 508 + i * 54;
     text(ctx, r[0], 780, y, 20, 'rgba(255,241,222,.55)', 'left');

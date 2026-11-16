@@ -34,6 +34,18 @@ It needs to be served over HTTP (it uses ES modules), not opened from the filesy
 On touch screens the move, jump and rewind buttons appear on screen; drag anywhere else to
 cut. Falling respawns you at the last checkpoint — it does not reset your cuts or your tape.
 
+## Progress
+
+The game saves to the browser's `localStorage` (`reality-editor.v1`): the furthest scene
+you unlocked, which scenes you have cleared, whether you finished, and your best full-run
+time. The title screen grows a **CONTINUE · SCENE 0N** button once something is unlocked, and
+the wrap screen shows your best run.
+
+Storage is optional, never required: a blocked or full storage backend (private mode, a
+strict iframe embed) means the game simply doesn't persist. Every read is validated, so a
+corrupt or hand-edited entry falls back to a blank save. Clearing your browser's site data
+wipes it; there is no other copy.
+
 ## The nine scenes
 
 Every scene hands you a full tape and four blades. Cutting spends a blade; rewinding
@@ -62,9 +74,9 @@ cd reality-editor
 ./tests/run-tests.sh
 ```
 
-94 assertions over the mechanics, all nine scenes and the progression between them, plus a
-check that runs the real `requestAnimationFrame` loop in headless Chromium and plays it with
-real input.
+102 assertions over the mechanics, all nine scenes, the progression between them and the
+save file, plus a check that runs the real `requestAnimationFrame` loop in headless Chromium
+and plays it with real input.
 
 ## Layout
 
@@ -72,7 +84,7 @@ real input.
 reality-editor/
   index.html      the game page
   src/            config, levels (the shoot list), themes (backdrops), world (clock + cuts),
-                  player, input, render, game, audio
+                  player, input, render, game, audio, save (localStorage progress)
   tests/          assertions, real-loop check, staged screenshot scenes, recording bot
   dist/           itch.io release zip, cover and screenshots
   PROGRESS.md     build log, test evidence, known limits

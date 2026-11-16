@@ -7,6 +7,7 @@ import { Player } from './player.js';
 import { Input } from './input.js';
 import { render, screenRectToWorld } from './render.js';
 import { audio } from './audio.js';
+import { readSave, writeSave, resumeIndex } from './save.js';
 
 const W = CONFIG.view.w;
 const H = CONFIG.view.h;
@@ -27,6 +28,7 @@ export function createGame(canvas, levelsOrLevel) {
   const view = { dpr: 1, scale: 1, ox: 0, oy: 0 };
   const cam = { x: 0, zoom: 1 };
 
+  const save = readSave();
   const world = new World(level);
   const player = new Player(level.spawn.x, level.spawn.y);
 
@@ -46,6 +48,7 @@ export function createGame(canvas, levelsOrLevel) {
     levelIndex: 0,
     levelCount: levels.length,
     level,
+    save,
     stats: null
   };
 
@@ -122,10 +125,17 @@ export function createGame(canvas, levelsOrLevel) {
     }
 
     if (game.state === 'title') {
+      const canContinue = save.unlocked > 0;
+      if (canContinue && hit(CONFIG.ui.titleContinue, click)) {
+        audio.init();
+        audio.click();
+        startRun(resumeIndex(save, levels.length));
+        return;
+      }
       if (jumpPressed || hit(CONFIG.ui.title, click)) {
         audio.init();
         audio.click();
-        startRun();
+        startRun(0);
       }
       return;
     }
@@ -256,10 +266,20 @@ export function createGame(canvas, levelsOrLevel) {
           blades: world.cutsLeft(),
           tape: world.tape
         };
+        save.cleared = [...new Set([...save.cleared, game.levelIndex])];
+
         if (game.levelIndex + 1 < levels.length) {
+          save.unlocked = Math.max(save.unlocked, game.levelIndex + 1);
+          writeSave(save);
           audio.chime();
           game.state = 'cleared';
         } else {
+          save.unlocked = Math.max(save.unlocked, game.levelIndex);
+          save.finished = true;
+          if (!save.best || game.stats.time < save.best.time) {
+            save.best = { time: game.stats.time };
+          }
+          writeSave(save);
           audio.win();
           game.state = 'won';
         }
@@ -299,6 +319,7 @@ export function createGame(canvas, levelsOrLevel) {
     view, cam, world, player, input, game,
     resize, step, draw,
     startRun, togglePause, nextLevel,
+    get save() { return save; },
     get level() { return level; },
     get state() { return game.state; }
   };
